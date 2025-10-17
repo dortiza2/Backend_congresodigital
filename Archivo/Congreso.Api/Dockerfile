@@ -1,5 +1,5 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS base
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+# Build stage (SDK 9.0)
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
 # Copy csproj and restore dependencies
@@ -12,10 +12,10 @@ RUN dotnet build "Congreso.Api.csproj" -c Release -o /app/build
 
 # Publish stage
 FROM build AS publish
-RUN dotnet publish "Congreso.Api.csproj" -c Release -o /app/publish
+RUN dotnet publish "Congreso.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
-# Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+# Runtime stage (ASP.NET 9.0)
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 
 # Install curl for health checks
@@ -31,8 +31,9 @@ COPY --from=publish /app/publish .
 # Expose port (Render provides PORT at runtime; default to 8080 locally)
 EXPOSE 8080
 
-# Use bash to allow runtime env expansion of PORT
+# Healthcheck using dynamic PORT
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
   CMD curl -f "http://localhost:${PORT:-8080}/healthz" || exit 1
 
+# Bind ASP.NET Core to the given PORT at runtime
 ENTRYPOINT ["/bin/bash", "-lc", "ASPNETCORE_URLS=\"http://+:${PORT:-8080}\" dotnet Congreso.Api.dll"]
