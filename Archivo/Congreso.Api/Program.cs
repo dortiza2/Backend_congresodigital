@@ -455,6 +455,19 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+// APLICAR MIGRACIONES EN TODOS LOS ENTORNOS (incluye producción)
+try
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<CongresoDbContext>();
+    db.Database.Migrate();
+    Console.WriteLine($"[DB] Migraciones aplicadas al arranque. Entorno: {app.Environment.EnvironmentName}");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[DB] Error aplicando migraciones al arranque: {ex.Message}");
+}
+
 // Global exception handling is now handled by DomainExceptionFilter
 
 // Configure the HTTP request pipeline.
@@ -698,18 +711,14 @@ class PostgresHealthCheck : IHealthCheck
         try
         {
             await using var conn = await _dataSource.OpenConnectionAsync(cancellationToken);
-            // No depender de vistas ni permisos específicos: prueba mínima de conectividad
-            await using var cmd = new NpgsqlCommand("SELECT 1;", conn);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT 1";
             var result = await cmd.ExecuteScalarAsync(cancellationToken);
-            if (result is null)
-            {
-                return HealthCheckResult.Unhealthy("Connectivity check returned no result.");
-            }
-            return HealthCheckResult.Healthy("Postgres health check passed.");
+            return HealthCheckResult.Healthy("Postgres is reachable");
         }
         catch (Exception ex)
         {
-            return HealthCheckResult.Unhealthy($"Postgres health check failed: {ex.Message}");
+            return HealthCheckResult.Unhealthy("Postgres check failed", ex);
         }
     }
 }

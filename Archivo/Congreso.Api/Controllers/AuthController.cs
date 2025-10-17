@@ -27,7 +27,6 @@ public class AuthController : ControllerBase
 {
     private readonly CongresoDbContext _db;
     private readonly IEmailService _emailService;
-    private readonly ILogger<AuthController> _logger;
     private readonly IConfiguration _configuration;
     private readonly IAuthTokenService _authTokenService;
 
@@ -472,6 +471,18 @@ public class AuthController : ControllerBase
                 }
             });
         }
+        catch (DbUpdateException ex)
+        {
+            // Capturar detalles de Postgres si están disponibles
+            var root = ex.GetBaseException();
+            string? inner = ex.InnerException?.Message ?? root?.Message;
+            _logger.LogError(ex, "DbUpdateException al registrar usuario {Email}: {Message}", dto.Email, ex.Message);
+            if (!string.IsNullOrWhiteSpace(inner))
+            {
+                _logger.LogError("Inner: {Inner}", inner);
+            }
+            return StatusCode(500, new { message = "Error interno del servidor", details = ex.Message, inner = inner });
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error al registrar usuario para {Email}. Detalles: {Message}", dto.Email, ex.Message);
@@ -479,7 +490,7 @@ public class AuthController : ControllerBase
             {
                 _logger.LogError("Inner exception: {InnerMessage}", ex.InnerException.Message);
             }
-            return StatusCode(500, new { message = "Error interno del servidor", details = ex.Message });
+            return StatusCode(500, new { message = "Error interno del servidor", details = ex.Message, inner = ex.InnerException?.Message });
         }
 
         // Enviar email de confirmación (fuera de la transacción y fuera de los reintentos)
