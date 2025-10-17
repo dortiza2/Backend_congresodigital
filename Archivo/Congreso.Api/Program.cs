@@ -21,8 +21,8 @@ using Congreso.Api.Infrastructure;
 using Congreso.Api.Infrastructure.HealthChecks;
 using Congreso.Api.Repositories;
 using Congreso.Api.Configuration;
-using Congreso.Api.Middleware;
 using System.Text.RegularExpressions;
+using System.IO;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -352,6 +352,27 @@ if (builder.Environment.IsDevelopment())
         .PersistKeysToFileSystem(new DirectoryInfo(@"./keys"))
         .SetApplicationName("CongresoApi");
 }
+else
+{
+    // En producción: persistir claves en Postgres para sesiones/cookies estables entre despliegues
+    builder.Services.AddDataProtection()
+        .PersistKeysToDbContext<CongresoDbContext>()
+        .SetApplicationName("CongresoApi");
+}
+
+// Redirección HTTPS: fija el puerto público a 443 para evitar warnings en contenedor
+builder.Services.AddHttpsRedirection(options =>
+{
+    options.HttpsPort = 443;
+});
+
+// Encabezados reenviados: respeta X-Forwarded-For/Proto detrás del proxy
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Configure HSTS for production
 if (!builder.Environment.IsDevelopment())
@@ -462,6 +483,23 @@ try
     var db = scope.ServiceProvider.GetRequiredService<CongresoDbContext>();
     db.Database.Migrate();
     Console.WriteLine($"[DB] Migraciones aplicadas al arranque. Entorno: {app.Environment.EnvironmentName}");
+
+    // Asegurar tabla para DataProtectionKeys si aún no existe (sin requerir nueva migración)
+    try
+    {
+        var created = db.Database.ExecuteSqlRaw(
+            @"CREATE TABLE IF NOT EXISTS ""DataProtectionKeys"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""FriendlyName"" text NULL,
+                ""Xml"" text NOT NULL
+            );");
+        if (created >= 0)
+            Console.WriteLine("[DP] Tabla DataProtectionKeys verificada/creada.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[DP] No se pudo asegurar la tabla DataProtectionKeys: {ex.Message}");
+    }
 }
 catch (Exception ex)
 {
@@ -482,6 +520,9 @@ app.UseSwaggerUI(options =>
     options.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.None);
     options.EnablePersistAuthorization();
 });
+
+// Debe ir muy temprano para que el esquema y la IP originales se respeten
+app.UseForwardedHeaders();
 
 if (!app.Environment.IsDevelopment())
 {
@@ -697,28 +738,4 @@ if (app.Environment.IsDevelopment())
 
 app.Run();
 
-// Implementación de HealthCheck para Postgres
-class PostgresHealthCheck : IHealthCheck
-{
-    private readonly NpgsqlDataSource _dataSource;
-    public PostgresHealthCheck(NpgsqlDataSource dataSource)
-    {
-        _dataSource = dataSource;
-    }
-
-    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            await using var conn = await _dataSource.OpenConnectionAsync(cancellationToken);
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT 1";
-            var result = await cmd.ExecuteScalarAsync(cancellationToken);
-            return HealthCheckResult.Healthy("Postgres is reachable");
-        }
-        catch (Exception ex)
-        {
-            return HealthCheckResult.Unhealthy("Postgres check failed", ex);
-        }
-    }
-}
+// PostgresHealthCheck movido a Archivo/Congreso.Api/Infrastructure/PostgresHealthCheck.cs

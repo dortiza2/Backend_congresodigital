@@ -1,9 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Congreso.Api.Models;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 
 namespace Congreso.Api.Data;
 
-public partial class CongresoDbContext : DbContext
+public partial class CongresoDbContext : DbContext, IDataProtectionKeyContext
 {
     public CongresoDbContext(DbContextOptions<CongresoDbContext> options) : base(options)
     {
@@ -23,6 +24,7 @@ public partial class CongresoDbContext : DbContext
     public virtual DbSet<FaqItem> FaqItems { get; set; }
     public virtual DbSet<CheckInToken> CheckInTokens { get; set; }
     public virtual DbSet<QrJwtId> QrJwtIds { get; set; }
+    public virtual DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
 
     // Profile entities
     public virtual DbSet<StaffAccount> StaffAccounts { get; set; }
