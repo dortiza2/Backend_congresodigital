@@ -27,6 +27,7 @@ namespace Congreso.Api.Middleware
             var excludedPaths = new[]
             {
                 "/api/auth/login",
+                "/api/auth/register",
                 "/api/auth/google",
                 "/api/auth/callback",
                 "/api/auth/logout",
