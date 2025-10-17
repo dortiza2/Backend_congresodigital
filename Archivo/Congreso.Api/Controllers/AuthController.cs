@@ -29,6 +29,7 @@ public class AuthController : ControllerBase
     private readonly IEmailService _emailService;
     private readonly IConfiguration _configuration;
     private readonly IAuthTokenService _authTokenService;
+    private readonly ILogger<AuthController> _logger;
 
     public AuthController(CongresoDbContext db, IEmailService emailService, ILogger<AuthController> logger, IConfiguration configuration, IAuthTokenService authTokenService)
     {
