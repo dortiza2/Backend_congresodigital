@@ -30,15 +30,15 @@ namespace Congreso.Api.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<ActionResult<List<PodiumResponse>>> GetPodiumByYear([FromQuery] int year)
         {
+            // Validar rango de año
+            if (year < 2020 || year > 2030)
+            {
+                _logger.Warning("Año inválido solicitado: {Year}", year);
+                return BadRequest(new { error = "El año debe estar entre 2020 y 2030" });
+            }
+
             try
             {
-                // Validar rango de año
-                if (year < 2020 || year > 2030)
-                {
-                    _logger.Warning("Año inválido solicitado: {Year}", year);
-                    return BadRequest(new { error = "El año debe estar entre 2020 y 2030" });
-                }
-
                 _logger.Information("Obteniendo podio para año {Year}", year);
                 
                 // Obtener información de auditoría
@@ -55,7 +55,8 @@ namespace Congreso.Api.Controllers
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error al obtener podio para año {Year}", year);
-                return StatusCode(500, new { error = "Error interno al obtener el podio" });
+                // Por requerimiento, 200 [] en caso de error o sin datos
+                return Ok(new List<PodiumResponse>());
             }
         }
 

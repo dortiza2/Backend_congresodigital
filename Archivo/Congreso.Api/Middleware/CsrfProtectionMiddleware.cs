@@ -57,6 +57,16 @@ namespace Congreso.Api.Middleware
                 return;
             }
 
+            // Si la petición usa Bearer puro (sin cookie de sesión), no requiere CSRF
+            var authHeader = context.Request.Headers["Authorization"].ToString();
+            var hasBearer = authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase);
+            var hasAuthCookie = context.Request.Cookies.ContainsKey("auth-session");
+            if (hasBearer && !hasAuthCookie)
+            {
+                await _next(context);
+                return;
+            }
+
             // Validar token CSRF para métodos no seguros
             if (ShouldValidateCsrf(context))
             {

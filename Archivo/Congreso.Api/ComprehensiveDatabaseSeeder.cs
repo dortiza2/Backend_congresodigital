@@ -312,68 +312,80 @@ public class ComprehensiveDatabaseSeeder
         Console.WriteLine("7. Creando ganadores para 2025...");
         if (!await context.Winners.AnyAsync(w => w.EditionYear == 2025))
         {
-            var winners = new List<Winner>
+            var candidates = new (Guid activityId, Guid userId, short place)[]
             {
-                new Winner
-                {
-                    EditionYear = 2025,
-                    ActivityId = Guid.Parse("770e8400-e29b-41d4-a716-446655440001"),
-                    Place = 1,
-                    UserId = Guid.Parse("550e8400-e29b-41d4-a716-446655440011") // david1@congreso.com
-                },
-                new Winner
-                {
-                    EditionYear = 2025,
-                    ActivityId = Guid.Parse("770e8400-e29b-41d4-a716-446655440002"),
-                    Place = 2,
-                    UserId = Guid.Parse("550e8400-e29b-41d4-a716-446655440012") // david2@congreso.com
-                },
-                new Winner
-                {
-                    EditionYear = 2025,
-                    ActivityId = Guid.Parse("770e8400-e29b-41d4-a716-446655440003"),
-                    Place = 3,
-                    UserId = Guid.Parse("550e8400-e29b-41d4-a716-446655440013") // david3@congreso.com
-                }
+                (Guid.Parse("770e8400-e29b-41d4-a716-446655440001"), Guid.Parse("550e8400-e29b-41d4-a716-446655440011"), (short)1),
+                (Guid.Parse("770e8400-e29b-41d4-a716-446655440002"), Guid.Parse("550e8400-e29b-41d4-a716-446655440012"), (short)2),
+                (Guid.Parse("770e8400-e29b-41d4-a716-446655440003"), Guid.Parse("550e8400-e29b-41d4-a716-446655440013"), (short)3)
             };
-            
-            await context.Winners.AddRangeAsync(winners);
-            await context.SaveChangesAsync();
-            Console.WriteLine("✓ Ganadores 2025 creados exitosamente");
+
+            var winners = new List<Winner>();
+            foreach (var c in candidates)
+            {
+                var activityExists = await context.Activities.AnyAsync(a => a.Id == c.activityId);
+                var userExists = await context.Users.AnyAsync(u => u.Id == c.userId);
+                if (activityExists && userExists)
+                {
+                    winners.Add(new Winner
+                    {
+                        EditionYear = 2025,
+                        ActivityId = c.activityId,
+                        Place = c.place,
+                        UserId = c.userId
+                    });
+                }
+            }
+
+            if (winners.Count > 0)
+            {
+                await context.Winners.AddRangeAsync(winners);
+                await context.SaveChangesAsync();
+                Console.WriteLine($"✓ Ganadores 2025 creados exitosamente (insertados: {winners.Count})");
+            }
+            else
+            {
+                Console.WriteLine("↷ Ganadores 2025 omitidos: faltan actividades/usuarios esperados");
+            }
         }
 
         // 7b. CREAR GANADORES PARA 2023
         Console.WriteLine("7b. Creando ganadores para 2023...");
         if (!await context.Winners.AnyAsync(w => w.EditionYear == 2023))
         {
-            var winners2023 = new List<Winner>
+            var candidates2023 = new (Guid activityId, Guid userId, short place)[]
             {
-                new Winner
-                {
-                    EditionYear = 2023,
-                    ActivityId = Guid.Parse("770e8400-e29b-41d4-a716-446655440001"), // IA en la Industria
-                    Place = 1,
-                    UserId = Guid.Parse("550e8400-e29b-41d4-a716-446655440010") // david1@congreso.com (Staff 1)
-                },
-                new Winner
-                {
-                    EditionYear = 2023,
-                    ActivityId = Guid.Parse("770e8400-e29b-41d4-a716-446655440004"), // Taller ML
-                    Place = 2,
-                    UserId = Guid.Parse("550e8400-e29b-41d4-a716-446655440011") // david2@congreso.com (Staff 2)
-                },
-                new Winner
-                {
-                    EditionYear = 2023,
-                    ActivityId = Guid.Parse("770e8400-e29b-41d4-a716-446655440006"), // CTF Ciberseguridad
-                    Place = 3,
-                    UserId = Guid.Parse("550e8400-e29b-41d4-a716-446655440012") // david3@congreso.com (Staff 3)
-                }
+                (Guid.Parse("770e8400-e29b-41d4-a716-446655440001"), Guid.Parse("550e8400-e29b-41d4-a716-446655440010"), (short)1),
+                (Guid.Parse("770e8400-e29b-41d4-a716-446655440004"), Guid.Parse("550e8400-e29b-41d4-a716-446655440011"), (short)2),
+                (Guid.Parse("770e8400-e29b-41d4-a716-446655440006"), Guid.Parse("550e8400-e29b-41d4-a716-446655440012"), (short)3)
             };
 
-            await context.Winners.AddRangeAsync(winners2023);
-            await context.SaveChangesAsync();
-            Console.WriteLine("✓ Ganadores 2023 creados exitosamente");
+            var winners2023 = new List<Winner>();
+            foreach (var c in candidates2023)
+            {
+                var activityExists = await context.Activities.AnyAsync(a => a.Id == c.activityId);
+                var userExists = await context.Users.AnyAsync(u => u.Id == c.userId);
+                if (activityExists && userExists)
+                {
+                    winners2023.Add(new Winner
+                    {
+                        EditionYear = 2023,
+                        ActivityId = c.activityId,
+                        Place = c.place,
+                        UserId = c.userId
+                    });
+                }
+            }
+
+            if (winners2023.Count > 0)
+            {
+                await context.Winners.AddRangeAsync(winners2023);
+                await context.SaveChangesAsync();
+                Console.WriteLine($"✓ Ganadores 2023 creados exitosamente (insertados: {winners2023.Count})");
+            }
+            else
+            {
+                Console.WriteLine("↷ Ganadores 2023 omitidos: faltan actividades/usuarios esperados");
+            }
         }
 
         // 8. CREAR INSCRIPCIONES DE PRUEBA

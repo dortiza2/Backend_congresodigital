@@ -119,7 +119,8 @@ namespace Congreso.Api.Controllers
             return Ok(faqItems);
         }
 
-        [HttpGet("podium")]
+        [HttpGet("podium-view")]
+        [ApiExplorerSettings(IgnoreApi = true)]
         public async Task<ActionResult> GetPodium([FromQuery] int year)
         {
             if (year <= 0)

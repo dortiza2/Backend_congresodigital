@@ -12,6 +12,7 @@ using Congreso.Api.Models;
 using Congreso.Api.Models.Email;
 using Congreso.Api.Attributes;
 using Npgsql;
+using Microsoft.AspNetCore.Antiforgery;
 
 namespace Congreso.Api.Controllers;
 
@@ -96,6 +97,16 @@ public class AuthController : ControllerBase
             _logger.LogWarning(ex, "POST /api/auth/login: error inesperado, devolviendo 401 controlado");
             return Unauthorized(new { message = "Invalid credentials" });
         }
+    }
+
+    [AllowAnonymous]
+    [HttpGet("csrf")]
+    public IActionResult GetCsrf([FromServices] IAntiforgery antiforgery)
+    {
+        // Emite cookie XSRF-TOKEN mediante Antiforgery y devuelve el token para header X-XSRF-TOKEN
+        var tokens = antiforgery.GetAndStoreTokens(HttpContext);
+        var token = tokens.RequestToken ?? string.Empty;
+        return Ok(new { token, headerName = "X-XSRF-TOKEN" });
     }
 
     [Authorize]

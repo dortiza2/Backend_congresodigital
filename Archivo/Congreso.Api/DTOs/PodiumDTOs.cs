@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System;
 
 namespace Congreso.Api.DTOs
 {
@@ -7,11 +8,11 @@ namespace Congreso.Api.DTOs
         public int Id { get; set; }
         public int Year { get; set; }
         public int Place { get; set; }
-        public int ActivityId { get; set; }
+        public Guid? ActivityId { get; set; }
         public string ActivityTitle { get; set; } = string.Empty;
-        public int UserId { get; set; }
-        public string WinnerName { get; set; } = string.Empty;
-        public DateTime AwardDate { get; set; }
+        public int? UserId { get; set; }
+        public string? WinnerName { get; set; }
+        public DateTime? AwardDate { get; set; }
         public int? TeamId { get; set; }
         public string? PrizeDescription { get; set; }
     }

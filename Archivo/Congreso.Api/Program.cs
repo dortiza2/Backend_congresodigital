@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Congreso.Api.Data;
 using Congreso.Api.Middleware;
 using Congreso.Api.Models;
@@ -47,8 +48,8 @@ try
 catch { /* ignore dotenv load errors */ }
 
 // Resolver cadena de conexión, priorizando DATABASE_URL (Neon)
-string cs;
-var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+string? cs = null;
+var databaseUrl = builder.Configuration["DATABASE_URL"] ?? Environment.GetEnvironmentVariable("DATABASE_URL");
 
 string ResolvePlaceholders(string s)
 {
@@ -61,17 +62,20 @@ string ResolvePlaceholders(string s)
     });
 }
 
+
 if (!string.IsNullOrWhiteSpace(databaseUrl))
 {
     try
     {
         var uri = new Uri(databaseUrl);
         var userInfo = uri.UserInfo.Split(':', 2);
-        var host = uri.Host;
+        var host = (uri.Host ?? string.Empty).Trim();
         var port = uri.Port > 0 ? uri.Port : 5432;
-        var db = uri.AbsolutePath.TrimStart('/');
-        var user = Uri.UnescapeDataString(userInfo[0]);
+        var db = (uri.AbsolutePath ?? string.Empty).Trim('/').Trim();
+        var user = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : string.Empty;
         var pass = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty;
+        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(db) || string.IsNullOrWhiteSpace(user))
+            throw new ArgumentException("Invalid DATABASE_URL: missing host/db/user");
         // Ajustes para Neon: SSL requerido, pooling moderado y multiplexing (sin Keepalive)
         cs = $"Host={host};Port={port};Database={db};Username={user};Password={pass};Ssl Mode=Require;Trust Server Certificate=true;Pooling=true;Maximum Pool Size=20;Timeout=30;Command Timeout=60";
     }
@@ -109,6 +113,34 @@ else
     }
 }
 
+// Si cs quedó definida pero inválida (p.ej., Host vacío), normalizar para usar fallback final
+try
+{
+    if (!string.IsNullOrWhiteSpace(cs))
+    {
+        var vb = new NpgsqlConnectionStringBuilder(cs);
+        if (string.IsNullOrWhiteSpace(vb.Host))
+        {
+            cs = null;
+        }
+    }
+}
+catch
+{
+    cs = null;
+}
+
+// Fallback final: si aún no hay cadena válida, construir desde variables de entorno con defaults seguros
+if (string.IsNullOrWhiteSpace(cs))
+{
+    var host = Environment.GetEnvironmentVariable("DB_HOST") ?? "127.0.0.1";
+    var port = Environment.GetEnvironmentVariable("DB_PORT") ?? "5432";
+    var name = Environment.GetEnvironmentVariable("DB_NAME") ?? "congreso";
+    var user = Environment.GetEnvironmentVariable("DB_USER") ?? "user_congreso";
+    var pwd  = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? string.Empty;
+    cs = $"Host={host};Port={port};Database={name};Username={user};Password={pwd};Pooling=true;Maximum Pool Size=20;Timeout=30;Command Timeout=60;Trust Server Certificate=true;Ssl Mode=Require";
+}
+
 builder.Services.AddSingleton(sp =>
 {
     try
@@ -132,6 +164,7 @@ builder.Services.AddDbContext<CongresoDbContext>(options =>
         npgsqlOptions.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(10), errorCodesToAdd: null);
         npgsqlOptions.CommandTimeout(60);
     });
+    options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
     if (builder.Environment.IsDevelopment())
     {
         if (bool.TryParse(builder.Configuration["ENABLE_SENSITIVE_LOGS"], out var sdl) && sdl)
@@ -230,7 +263,23 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddGlobalInputValidation();
 builder.Services.AddMemoryCache(); // Required for rate limiting
 builder.Services.AddRateLimiting(); // Register rate limiting services
-builder.Services.AddAntiforgery(); // Required for CSRF protection
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-XSRF-TOKEN";
+    options.Cookie.Name = "XSRF-TOKEN";
+    options.Cookie.HttpOnly = false; // accesible desde JS para frameworks SPA
+    options.Cookie.Path = "/";
+    if (builder.Environment.IsDevelopment())
+    {
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.None;
+    }
+    else
+    {
+        options.Cookie.SameSite = SameSiteMode.None; // necesario para cross-site con frontend
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    }
+}); // Required for CSRF protection
 
 // Add FluentValidation
 builder.Services.AddFluentValidation();
@@ -450,6 +499,16 @@ builder.Services.AddSwaggerGen(options =>
         var fullName = type.FullName ?? type.Name;
         return fullName.Replace(".", "_").Replace("+", "_");
     });
+
+    // Configuración para manejar IFormFile en Swagger
+    options.MapType<IFormFile>(() => new Microsoft.OpenApi.Models.OpenApiSchema
+    {
+        Type = "string",
+        Format = "binary"
+    });
+
+    // Configuración adicional para manejar formularios multipart
+    options.OperationFilter<SwaggerFileOperationFilter>();
 });
 // Swagger ya configurado arriba con opciones detalladas
 
@@ -480,49 +539,65 @@ builder.Services.AddHealthChecks()
 var app = builder.Build();
 
 // APLICAR MIGRACIONES EN TODOS LOS ENTORNOS (incluye producción)
+bool canDbConnect = false;
 try
 {
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<CongresoDbContext>();
-    db.Database.Migrate();
-    Console.WriteLine($"[DB] Migraciones aplicadas al arranque. Entorno: {app.Environment.EnvironmentName}");
+    var quickCs = cs?.Contains("Timeout=") == true ? cs : (cs + ";Timeout=3;Command Timeout=3");
+    using var test = new Npgsql.NpgsqlConnection(quickCs);
+    test.Open();
+    canDbConnect = true;
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[DB] No se pudo conectar a Postgres rápidamente, se omiten migraciones por ahora: {ex.Message}");
+}
 
-    // Seeder mínimo en producción si SEED_MINIMAL=true
+if (canDbConnect)
+{
     try
     {
-        var seedFlag = Environment.GetEnvironmentVariable("SEED_MINIMAL");
-        if (!string.IsNullOrWhiteSpace(seedFlag) && string.Equals(seedFlag, "true", StringComparison.OrdinalIgnoreCase))
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CongresoDbContext>();
+        db.Database.Migrate();
+        Console.WriteLine($"[DB] Migraciones aplicadas al arranque. Entorno: {app.Environment.EnvironmentName}");
+
+        // Seeder mínimo en producción si SEED_MINIMAL=true
+        try
         {
-            var hasher = scope.ServiceProvider.GetRequiredService<Congreso.Api.Services.IPasswordHasher>();
-            Congreso.Api.MinimalProductionSeeder.SeedAsync(db, hasher).GetAwaiter().GetResult();
-            Console.WriteLine("[SeedMinimal] Ejecutado correctamente en arranque.");
+            var seedFlag = Environment.GetEnvironmentVariable("SEED_MINIMAL");
+            if (!string.IsNullOrWhiteSpace(seedFlag) && string.Equals(seedFlag, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                var hasher = scope.ServiceProvider.GetRequiredService<Congreso.Api.Services.IPasswordHasher>();
+                Congreso.Api.MinimalProductionSeeder.SeedAsync(db, hasher).GetAwaiter().GetResult();
+                Console.WriteLine("[SeedMinimal] Ejecutado correctamente en arranque.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SeedMinimal] Error durante seeding mínimo: {ex.Message}");
+        }
+
+        // Asegurar tabla para DataProtectionKeys si aún no existe (sin requerir nueva migración)
+        try
+        {
+            var created = db.Database.ExecuteSqlRaw(
+                @"CREATE TABLE IF NOT EXISTS ""DataProtectionKeys"" (
+                    ""Id"" SERIAL PRIMARY KEY,
+                    ""FriendlyName"" text NULL,
+                    ""Xml"" text NOT NULL
+                );");
+            if (created >= 0)
+                Console.WriteLine("[DP] Tabla DataProtectionKeys verificada/creada.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[DP] No se pudo asegurar la tabla DataProtectionKeys: {ex.Message}");
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[SeedMinimal] Error durante seeding mínimo: {ex.Message}");
+        Console.WriteLine($"[DB] Error aplicando migraciones al arranque: {ex.Message}");
     }
-
-    // Asegurar tabla para DataProtectionKeys si aún no existe (sin requerir nueva migración)
-    try
-    {
-        var created = db.Database.ExecuteSqlRaw(
-            @"CREATE TABLE IF NOT EXISTS ""DataProtectionKeys"" (
-                ""Id"" SERIAL PRIMARY KEY,
-                ""FriendlyName"" text NULL,
-                ""Xml"" text NOT NULL
-            );");
-        if (created >= 0)
-            Console.WriteLine("[DP] Tabla DataProtectionKeys verificada/creada.");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[DP] No se pudo asegurar la tabla DataProtectionKeys: {ex.Message}");
-    }
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"[DB] Error aplicando migraciones al arranque: {ex.Message}");
 }
 
 // Global exception handling is now handled by DomainExceptionFilter
@@ -746,7 +821,13 @@ if (app.Environment.IsDevelopment())
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Seeder] Error durante el seed: {ex.Message}");
+            Console.WriteLine("[Seeder] Error durante el seed:");
+            Console.WriteLine(ex.ToString());
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine("Inner: " + ex.InnerException.Message);
+                Console.WriteLine(ex.InnerException.ToString());
+            }
         }
     }
     catch (Exception ex)

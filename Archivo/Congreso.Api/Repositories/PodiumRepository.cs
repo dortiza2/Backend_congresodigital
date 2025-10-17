@@ -113,19 +113,16 @@ public class PodiumRepository : IPodiumRepository
             SELECT 
                 id,
                 year,
-                place,
-                activity_id as ActivityId,
-                activity_title as ActivityTitle,
-                user_id as UserId,
-                winner_name as WinnerName,
-                award_date as AwardDate,
-                team_id as TeamId,
-                prize_description as PrizeDescription,
-                created_at as CreatedAt,
-                updated_at as UpdatedAt
+                COALESCE(place, position) AS Place,
+                activity_id AS ActivityId,
+                activity_title AS ActivityTitle,
+                user_id AS UserId,
+                COALESCE(winner_name, user_full_name) AS WinnerName,
+                award_date AS AwardDate,
+                COALESCE(prize_description, prize) AS PrizeDescription
             FROM vw_podium_by_year 
             WHERE year = @Year 
-            ORDER BY place ASC, id ASC";
+            ORDER BY COALESCE(place, position) ASC, id ASC";
 
         try
         {
@@ -147,16 +144,13 @@ public class PodiumRepository : IPodiumRepository
             SELECT 
                 id,
                 year,
-                place,
-                activity_id as ActivityId,
-                activity_title as ActivityTitle,
-                user_id as UserId,
-                winner_name as WinnerName,
-                award_date as AwardDate,
-                team_id as TeamId,
-                prize_description as PrizeDescription,
-                created_at as CreatedAt,
-                updated_at as UpdatedAt
+                COALESCE(place, position) AS Place,
+                activity_id AS ActivityId,
+                activity_title AS ActivityTitle,
+                user_id AS UserId,
+                COALESCE(winner_name, user_full_name) AS WinnerName,
+                award_date AS AwardDate,
+                COALESCE(prize_description, prize) AS PrizeDescription
             FROM vw_podium_by_year 
             WHERE id = @Id";
 
@@ -179,18 +173,15 @@ public class PodiumRepository : IPodiumRepository
             SELECT 
                 id,
                 year,
-                place,
-                activity_id as ActivityId,
-                activity_title as ActivityTitle,
-                user_id as UserId,
-                winner_name as WinnerName,
-                award_date as AwardDate,
-                team_id as TeamId,
-                prize_description as PrizeDescription,
-                created_at as CreatedAt,
-                updated_at as UpdatedAt
+                COALESCE(place, position) AS Place,
+                activity_id AS ActivityId,
+                activity_title AS ActivityTitle,
+                user_id AS UserId,
+                COALESCE(winner_name, user_full_name) AS WinnerName,
+                award_date AS AwardDate,
+                COALESCE(prize_description, prize) AS PrizeDescription
             FROM vw_podium_by_year 
-            ORDER BY year DESC, place ASC, id ASC
+            ORDER BY year DESC, COALESCE(place, position) ASC, id ASC
             LIMIT @PageSize OFFSET @Offset";
 
         try

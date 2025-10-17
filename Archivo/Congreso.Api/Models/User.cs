@@ -7,7 +7,7 @@ namespace Congreso.Api.Models;
 public partial class User
 {
     [Key]
-    [Column("id_guid")]
+    [Column("id")]
     public Guid Id { get; set; }
 
     [Column("email")]
@@ -23,7 +23,7 @@ public partial class User
     [Column("is_umg")]
     public bool IsUmg { get; set; } = false;
 
-    [Column("last_login_at")]
+    [Column("last_login")]
     public DateTime? LastLogin { get; set; }
 
     [Column("created_at")]

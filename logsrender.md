@@ -1,50 +1,50 @@
-2025-10-17T08:20:24.856469539Z          at Microsoft.EntityFrameworkCore.Storage.ExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
-2025-10-17T08:20:24.856471309Z          at Congreso.Api.Controllers.AuthController.Register(RegisterDto dto) in /src/Controllers/AuthController.cs:line 401
-2025-10-17T08:20:24.856472959Z fail: Congreso.Api.Controllers.AuthController[0]
-2025-10-17T08:20:24.856474619Z       Inner: 42P01: relation "student_accounts" does not exist
-2025-10-17T08:20:24.856476329Z       
-2025-10-17T08:20:24.856478039Z       POSITION: 13
-2025-10-17T08:20:24.887400851Z info: Congreso.Api.Middleware.StructuredLoggingMiddleware[0]
-2025-10-17T08:20:24.887421442Z       REQUEST_COMPLETE {"timestamp":"2025-10-17T08:20:24.887Z","level":"error","service":"Congreso.Api","trace_id":"49df5852-c97e-4956-82e0-0c8bb30f204c","request_id":"8cd52a11-5981-441c-8082-41357ed0e874","event_type":"request_complete","duration_ms":2863,"http":{"method":"POST","endpoint":"/api/auth/register","status_code":500,"user_id":"anonymous","ip_address":"10.229.95.193"}}
-2025-10-17T08:20:30.820607026Z info: Congreso.Api.Middleware.StructuredLoggingMiddleware[0]
-2025-10-17T08:20:30.820635987Z       REQUEST_START {"timestamp":"2025-10-17T08:20:30.820Z","level":"info","service":"Congreso.Api","trace_id":"aff70493-738c-456b-873a-dbf658bbebd5","request_id":"85934120-ac3f-44c8-b0f5-76965e8fe566","event_type":"request_start","http":{"method":"POST","endpoint":"/api/auth/login","user_agent":"curl/8.7.1","ip_address":"10.229.95.193","user_id":"anonymous","query_string":"","referrer":null}}
-2025-10-17T08:20:30.820840809Z info: Congreso.Api.Middleware.RateLimitingMiddleware[0]
-2025-10-17T08:20:30.820852189Z       Rate limit attempt: 10.229.95.193 /api/auth/login POST 1/5
-2025-10-17T08:20:30.889152995Z info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-2025-10-17T08:20:30.889187807Z       Executed DbCommand (66ms) [Parameters=[@__dto_Email_0='?'], CommandType='Text', CommandTimeout='60']
-2025-10-17T08:20:30.889197388Z       SELECT u.id_guid, u.avatar_url, u.created_at, u.email, u.full_name, u.is_active, u.is_umg, u.last_login_at, u.org_id, u.org_name, u.password_hash, u.status, u.updated_at
-2025-10-17T08:20:30.889202958Z       FROM users AS u
-2025-10-17T08:20:30.889207928Z       WHERE u.email = @__dto_Email_0
-2025-10-17T08:20:30.889212388Z       LIMIT 1
-2025-10-17T08:20:30.889802421Z info: Congreso.Api.Middleware.StructuredLoggingMiddleware[0]
-2025-10-17T08:20:30.889818313Z       REQUEST_COMPLETE {"timestamp":"2025-10-17T08:20:30.889Z","level":"warning","service":"Congreso.Api","trace_id":"aff70493-738c-456b-873a-dbf658bbebd5","request_id":"85934120-ac3f-44c8-b0f5-76965e8fe566","event_type":"request_complete","duration_ms":69,"http":{"method":"POST","endpoint":"/api/auth/login","status_code":401,"user_id":"anonymous","ip_address":"10.229.95.193"}}
-2025-10-17T08:20:30.889823313Z warn: Congreso.Api.Middleware.StructuredLoggingMiddleware[0]
-2025-10-17T08:20:30.889827403Z       UNAUTHORIZED_ACCESS {"timestamp":"2025-10-17T08:20:30.889Z","level":"warning","service":"Congreso.Api","trace_id":"aff70493-738c-456b-873a-dbf658bbebd5","request_id":"85934120-ac3f-44c8-b0f5-76965e8fe566","event_type":"unauthorized_access","http":{"method":"POST","endpoint":"/api/auth/login","status_code":401,"user_id":"anonymous","ip_address":"10.229.95.193"}}
-2025-10-17T08:20:43.236110902Z info: Congreso.Api.Middleware.StructuredLoggingMiddleware[0]
-2025-10-17T08:20:43.236140934Z       REQUEST_START {"timestamp":"2025-10-17T08:20:43.235Z","level":"info","service":"Congreso.Api","trace_id":"fe287241-1fc8-4862-b60c-897005787a14","request_id":"89117f3d-be03-4488-b5a2-5326bc4eec0b","event_type":"request_start","http":{"method":"POST","endpoint":"/api/auth/login","user_agent":"curl/8.7.1","ip_address":"10.229.243.66","user_id":"anonymous","query_string":"","referrer":null}}
-2025-10-17T08:20:43.236152785Z info: Congreso.Api.Middleware.RateLimitingMiddleware[0]
-2025-10-17T08:20:43.236157345Z       Rate limit attempt: 10.229.243.66 /api/auth/login POST 1/5
-2025-10-17T08:20:43.304314263Z info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-2025-10-17T08:20:43.304333044Z       Executed DbCommand (66ms) [Parameters=[@__dto_Email_0='?'], CommandType='Text', CommandTimeout='60']
-2025-10-17T08:20:43.304336844Z       SELECT u.id_guid, u.avatar_url, u.created_at, u.email, u.full_name, u.is_active, u.is_umg, u.last_login_at, u.org_id, u.org_name, u.password_hash, u.status, u.updated_at
-2025-10-17T08:20:43.304340214Z       FROM users AS u
-2025-10-17T08:20:43.304343434Z       WHERE u.email = @__dto_Email_0
-2025-10-17T08:20:43.304346385Z       LIMIT 1
-2025-10-17T08:20:43.304899625Z info: Congreso.Api.Middleware.StructuredLoggingMiddleware[0]
-2025-10-17T08:20:43.304909286Z       REQUEST_COMPLETE {"timestamp":"2025-10-17T08:20:43.304Z","level":"warning","service":"Congreso.Api","trace_id":"fe287241-1fc8-4862-b60c-897005787a14","request_id":"89117f3d-be03-4488-b5a2-5326bc4eec0b","event_type":"request_complete","duration_ms":68,"http":{"method":"POST","endpoint":"/api/auth/login","status_code":401,"user_id":"anonymous","ip_address":"10.229.243.66"}}
-2025-10-17T08:20:43.304912616Z warn: Congreso.Api.Middleware.StructuredLoggingMiddleware[0]
-2025-10-17T08:20:43.304915506Z       UNAUTHORIZED_ACCESS {"timestamp":"2025-10-17T08:20:43.304Z","level":"warning","service":"Congreso.Api","trace_id":"fe287241-1fc8-4862-b60c-897005787a14","request_id":"89117f3d-be03-4488-b5a2-5326bc4eec0b","event_type":"unauthorized_access","http":{"method":"POST","endpoint":"/api/auth/login","status_code":401,"user_id":"anonymous","ip_address":"10.229.243.66"}}
-2025-10-17T08:20:49.24112696Z info: Congreso.Api.Middleware.StructuredLoggingMiddleware[0]
-2025-10-17T08:20:49.241161662Z       REQUEST_START {"timestamp":"2025-10-17T08:20:49.240Z","level":"info","service":"Congreso.Api","trace_id":"a55f324a-64ec-4849-aa2f-d115ac57e4f9","request_id":"8ee472a4-17ce-4cea-a296-e71c72114934","event_type":"request_start","http":{"method":"POST","endpoint":"/api/auth/login","user_agent":"curl/8.7.1","ip_address":"10.229.95.193","user_id":"anonymous","query_string":"","referrer":null}}
-2025-10-17T08:20:49.241166343Z info: Congreso.Api.Middleware.RateLimitingMiddleware[0]
-2025-10-17T08:20:49.241170993Z       Rate limit attempt: 10.229.95.193 /api/auth/login POST 2/5
-2025-10-17T08:20:49.30914183Z info: Microsoft.EntityFrameworkCore.Database.Command[20101]
-2025-10-17T08:20:49.309164331Z       Executed DbCommand (66ms) [Parameters=[@__dto_Email_0='?'], CommandType='Text', CommandTimeout='60']
-2025-10-17T08:20:49.309170102Z       SELECT u.id_guid, u.avatar_url, u.created_at, u.email, u.full_name, u.is_active, u.is_umg, u.last_login_at, u.org_id, u.org_name, u.password_hash, u.status, u.updated_at
-2025-10-17T08:20:49.309174942Z       FROM users AS u
-2025-10-17T08:20:49.309179663Z       WHERE u.email = @__dto_Email_0
-2025-10-17T08:20:49.309196673Z       LIMIT 1
-2025-10-17T08:20:49.309896423Z info: Congreso.Api.Middleware.StructuredLoggingMiddleware[0]
-2025-10-17T08:20:49.310321636Z       REQUEST_COMPLETE {"timestamp":"2025-10-17T08:20:49.309Z","level":"warning","service":"Congreso.Api","trace_id":"a55f324a-64ec-4849-aa2f-d115ac57e4f9","request_id":"8ee472a4-17ce-4cea-a296-e71c72114934","event_type":"request_complete","duration_ms":68,"http":{"method":"POST","endpoint":"/api/auth/login","status_code":401,"user_id":"anonymous","ip_address":"10.229.95.193"}}
-2025-10-17T08:20:49.310329607Z warn: Congreso.Api.Middleware.StructuredLoggingMiddleware[0]
-2025-10-17T08:20:49.310332777Z       UNAUTHORIZED_ACCESS {"timestamp":"2025-10-17T08:20:49.309Z","level":"warning","service":"Congreso.Api","trace_id":"a55f324a-64ec-4849-aa2f-d115ac57e4f9","request_id":"8ee472a4-17ce-4cea-a296-e71c72114934","event_type":"unauthorized_access","http":{"method":"POST","endpoint":"/api/auth/login","status_code":401,"user_id":"anonymous","ip_address":"10.229.95.193"}}
+2025-10-17T08:46:55.347934801Z ==> 
+2025-10-17T08:46:55.627806855Z ==> ///////////////////////////////////////////////////////////
+2025-10-17T08:46:55.655147153Z ==> 
+2025-10-17T08:46:55.680989332Z ==> Available at your primary URL https://congreso-api.onrender.com
+2025-10-17T08:46:55.70614686Z ==> 
+2025-10-17T08:46:55.735160839Z ==> ///////////////////////////////////////////////////////////
+2025-10-17T08:46:59.161852325Z info: Congreso.Api.Middleware.StructuredLoggingMiddleware[0]
+2025-10-17T08:46:59.161881186Z       REQUEST_START {"timestamp":"2025-10-17T08:46:59.039Z","level":"info","service":"Congreso.Api","trace_id":"0204a276-27ad-4fb4-a48a-aec7ca4e1422","request_id":"737f0fdb-b1fd-4027-9b41-fddf4cf52adf","event_type":"request_start","http":{"method":"GET","endpoint":"/","user_agent":"Go-http-client/2.0","ip_address":"10.229.199.194","user_id":"anonymous","query_string":"","referrer":null}}
+2025-10-17T08:46:59.466470057Z info: Congreso.Api.Middleware.StructuredLoggingMiddleware[0]
+2025-10-17T08:46:59.466492658Z       REQUEST_COMPLETE {"timestamp":"2025-10-17T08:46:59.459Z","level":"warning","service":"Congreso.Api","trace_id":"0204a276-27ad-4fb4-a48a-aec7ca4e1422","request_id":"737f0fdb-b1fd-4027-9b41-fddf4cf52adf","event_type":"request_complete","duration_ms":419,"http":{"method":"GET","endpoint":"/","status_code":404,"user_id":"anonymous","ip_address":"10.229.199.194"}}
+2025-10-17T08:47:03.664234851Z info: Congreso.Api.Middleware.StructuredLoggingMiddleware[0]
+2025-10-17T08:47:03.664266911Z       REQUEST_START {"timestamp":"2025-10-17T08:47:03.663Z","level":"info","service":"Congreso.Api","trace_id":"2ab12677-7d2a-46fe-8e88-cc618438e432","request_id":"0298389c-137e-4b41-97cb-2949b2af3135","event_type":"request_start","http":{"method":"GET","endpoint":"/healthz","user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) Gecko/20100101 Firefox/144.0","ip_address":"10.229.243.66","user_id":"anonymous","query_string":"","referrer":"https://congreso-api.onrender.com/healthz"}}
+2025-10-17T08:47:04.871478054Z info: Congreso.Api.Middleware.StructuredLoggingMiddleware[0]
+2025-10-17T08:47:04.871556925Z       REQUEST_COMPLETE {"timestamp":"2025-10-17T08:47:04.871Z","level":"info","service":"Congreso.Api","trace_id":"2ab12677-7d2a-46fe-8e88-cc618438e432","request_id":"0298389c-137e-4b41-97cb-2949b2af3135","event_type":"request_complete","duration_ms":1207,"http":{"method":"GET","endpoint":"/healthz","status_code":200,"user_id":"anonymous","ip_address":"10.229.243.66"}}
+2025-10-17T08:47:08.664975859Z fail: Microsoft.AspNetCore.Server.Kestrel[13]
+2025-10-17T08:47:08.66500655Z       Connection id "0HNGDB6S5TTSU", Request id "0HNGDB6S5TTSU:00000004": An unhandled exception was thrown by the application.
+2025-10-17T08:47:08.665019061Z       Swashbuckle.AspNetCore.SwaggerGen.SwaggerGeneratorException: Failed to generate Operation for action - Congreso.Api.Controllers.ImagesController.UpdateImage (Congreso.Api). See inner exception
+2025-10-17T08:47:08.665025141Z        ---> Swashbuckle.AspNetCore.SwaggerGen.SwaggerGeneratorException: Error reading parameter(s) for action Congreso.Api.Controllers.ImagesController.UpdateImage (Congreso.Api) as [FromForm] attribute used with IFormFile. Please refer to https://github.com/domaindrivendev/Swashbuckle.AspNetCore/tree/master/docs/configure-and-customize-swaggergen.md#handle-forms-and-file-uploads for more information
+2025-10-17T08:47:08.665028711Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GenerateParametersAsync(ApiDescription apiDescription, SchemaRepository schemaRepository, Func`3 parameterGenerator)
+2025-10-17T08:47:08.665031581Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GenerateParametersAsync(ApiDescription apiDescription, SchemaRepository schemaRepository)
+2025-10-17T08:47:08.665034771Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GenerateOperationAsync(OpenApiDocument document, ApiDescription apiDescription, SchemaRepository schemaRepository, Func`3 parametersGenerator, Func`3 bodyGenerator, Func`3 applyFilters)
+2025-10-17T08:47:08.665037781Z          --- End of inner exception stack trace ---
+2025-10-17T08:47:08.665040241Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GenerateOperationAsync(OpenApiDocument document, ApiDescription apiDescription, SchemaRepository schemaRepository, Func`3 parametersGenerator, Func`3 bodyGenerator, Func`3 applyFilters)
+2025-10-17T08:47:08.665042581Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GenerateOperationAsync(OpenApiDocument document, ApiDescription apiDescription, SchemaRepository schemaRepository)
+2025-10-17T08:47:08.665045181Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GenerateOperationsAsync(OpenApiDocument document, IEnumerable`1 apiDescriptions, SchemaRepository schemaRepository)
+2025-10-17T08:47:08.665047451Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GeneratePathsAsync(OpenApiDocument document, IEnumerable`1 apiDescriptions, SchemaRepository schemaRepository, Func`4 operationsGenerator)
+2025-10-17T08:47:08.665050081Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GeneratePathsAsync(OpenApiDocument document, IEnumerable`1 apiDescriptions, SchemaRepository schemaRepository)
+2025-10-17T08:47:08.665052941Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GetSwaggerAsync(String documentName, String host, String basePath)
+2025-10-17T08:47:08.665057291Z          at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+2025-10-17T08:47:08.665074172Z          at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ProcessRequests[TContext](IHttpApplication`1 application)
+2025-10-17T08:47:09.22854677Z info: Congreso.Api.Middleware.StructuredLoggingMiddleware[0]
+2025-10-17T08:47:09.228587611Z       REQUEST_START {"timestamp":"2025-10-17T08:47:09.228Z","level":"info","service":"Congreso.Api","trace_id":"91eb6927-5431-449c-9c02-1ba241d2c72d","request_id":"a7cf4948-2678-4c8c-80d8-bfc123d020f0","event_type":"request_start","http":{"method":"GET","endpoint":"/health/db","user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) Gecko/20100101 Firefox/144.0","ip_address":"10.229.243.66","user_id":"anonymous","query_string":"","referrer":"https://congreso-api.onrender.com/health/db"}}
+2025-10-17T08:47:09.298323731Z info: Congreso.Api.Middleware.StructuredLoggingMiddleware[0]
+2025-10-17T08:47:09.298487496Z       REQUEST_COMPLETE {"timestamp":"2025-10-17T08:47:09.297Z","level":"info","service":"Congreso.Api","trace_id":"91eb6927-5431-449c-9c02-1ba241d2c72d","request_id":"a7cf4948-2678-4c8c-80d8-bfc123d020f0","event_type":"request_complete","duration_ms":69,"http":{"method":"GET","endpoint":"/health/db","status_code":200,"user_id":"anonymous","ip_address":"10.229.243.66"}}
+2025-10-17T08:47:15.364867041Z fail: Microsoft.AspNetCore.Server.Kestrel[13]
+2025-10-17T08:47:15.364888842Z       Connection id "0HNGDB6S5TTSU", Request id "0HNGDB6S5TTSU:00000007": An unhandled exception was thrown by the application.
+2025-10-17T08:47:15.364892272Z       Swashbuckle.AspNetCore.SwaggerGen.SwaggerGeneratorException: Failed to generate Operation for action - Congreso.Api.Controllers.ImagesController.UpdateImage (Congreso.Api). See inner exception
+2025-10-17T08:47:15.364897612Z        ---> Swashbuckle.AspNetCore.SwaggerGen.SwaggerGeneratorException: Error reading parameter(s) for action Congreso.Api.Controllers.ImagesController.UpdateImage (Congreso.Api) as [FromForm] attribute used with IFormFile. Please refer to https://github.com/domaindrivendev/Swashbuckle.AspNetCore/tree/master/docs/configure-and-customize-swaggergen.md#handle-forms-and-file-uploads for more information
+2025-10-17T08:47:15.364900912Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GenerateParametersAsync(ApiDescription apiDescription, SchemaRepository schemaRepository, Func`3 parameterGenerator)
+2025-10-17T08:47:15.364903412Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GenerateParametersAsync(ApiDescription apiDescription, SchemaRepository schemaRepository)
+2025-10-17T08:47:15.364919873Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GenerateOperationAsync(OpenApiDocument document, ApiDescription apiDescription, SchemaRepository schemaRepository, Func`3 parametersGenerator, Func`3 bodyGenerator, Func`3 applyFilters)
+2025-10-17T08:47:15.364925183Z          --- End of inner exception stack trace ---
+2025-10-17T08:47:15.364927483Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GenerateOperationAsync(OpenApiDocument document, ApiDescription apiDescription, SchemaRepository schemaRepository, Func`3 parametersGenerator, Func`3 bodyGenerator, Func`3 applyFilters)
+2025-10-17T08:47:15.364929713Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GenerateOperationAsync(OpenApiDocument document, ApiDescription apiDescription, SchemaRepository schemaRepository)
+2025-10-17T08:47:15.364931763Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GenerateOperationsAsync(OpenApiDocument document, IEnumerable`1 apiDescriptions, SchemaRepository schemaRepository)
+2025-10-17T08:47:15.364933773Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GeneratePathsAsync(OpenApiDocument document, IEnumerable`1 apiDescriptions, SchemaRepository schemaRepository, Func`4 operationsGenerator)
+2025-10-17T08:47:15.364948083Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GeneratePathsAsync(OpenApiDocument document, IEnumerable`1 apiDescriptions, SchemaRepository schemaRepository)
+2025-10-17T08:47:15.364951314Z          at Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenerator.GetSwaggerAsync(String documentName, String host, String basePath)
+2025-10-17T08:47:15.364953594Z          at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+2025-10-17T08:47:15.364955924Z          at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ProcessRequests[TContext](IHttpApplication`1 application)
