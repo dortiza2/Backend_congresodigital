@@ -1,0 +1,97 @@
+name: Emergency Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to rollback'
+        required: true
+        type: choice
+        options:
+          - api
+          - frontend
+          - both
+      reason:
+        description: 'Reason for rollback'
+        required: true
+        type: string
+
+jobs:
+  rollback-api:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.service == 'api' || github.event.inputs.service == 'both'
+    
+    steps:
+    - name: Download last successful build
+      uses: actions/download-artifact@v3
+      with:
+        name: api-deployment
+        
+    - name: Deploy previous version
+      env:
+        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      run: |
+        echo "Rolling back API service..."
+        curl -X POST \
+          -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+          -H "Content-Type: application/json" \
+          -d '{"clearCache": "clear", "rollback": true}' \
+          https://api.render.com/v1/services/${{ secrets.RENDER_API_SERVICE_ID }}/deploys
+          
+    - name: Verify rollback
+      run: |
+        sleep 30
+        response=$(curl -s -o /dev/null -w "%{http_code}" https://api.congreso.umg.edu/healthz)
+        if [ $response -ne 200 ]; then
+          echo "Rollback verification failed!"
+          exit 1
+        fi
+        echo "API rollback successful!"
+
+  rollback-frontend:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.service == 'frontend' || github.event.inputs.service == 'both'
+    
+    steps:
+    - name: Download last successful build
+      uses: actions/download-artifact@v3
+      with:
+        name: frontend-deployment
+        
+    - name: Deploy previous version
+      env:
+        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      run: |
+        echo "Rolling back frontend service..."
+        curl -X POST \
+          -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+          -H "Content-Type: application/json" \
+          -d '{"clearCache": "clear", "rollback": true}' \
+          https://api.render.com/v1/services/${{ secrets.RENDER_FRONTEND_SERVICE_ID }}/deploys
+          
+    - name: Verify rollback
+      run: |
+        sleep 45
+        response=$(curl -s -o /dev/null -w "%{http_code}" https://congreso.umg.edu)
+        if [ $response -ne 200 ]; then
+          echo "Rollback verification failed!"
+          exit 1
+        fi
+        echo "Frontend rollback successful!"
+
+  notify-rollback:
+    needs: [rollback-api, rollback-frontend]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Notify rollback completion
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        text: |
+          🔄 Rollback completed!
+          Service: ${{ github.event.inputs.service }}
+          Reason: ${{ github.event.inputs.reason }}
+          Status: ${{ job.status }}
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}

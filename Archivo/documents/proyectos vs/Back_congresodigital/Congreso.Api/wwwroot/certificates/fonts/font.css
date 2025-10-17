@@ -1,0 +1,75 @@
+/***********************************
+ * Fuentes para Certificados *
+ ***********************************/
+
+/* Importación de fuentes de sistema */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Source+Sans+Pro:wght@300;400;600&display=swap');
+
+/* Definición de fuentes para certificados */
+.certificate-font-formal {
+    font-family: 'Playfair Display', serif;
+    font-weight: 400;
+}
+
+.certificate-font-formal-bold {
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+}
+
+.certificate-font-modern {
+    font-family: 'Source Sans Pro', sans-serif;
+    font-weight: 400;
+}
+
+.certificate-font-modern-light {
+    font-family: 'Source Sans Pro', sans-serif;
+    font-weight: 300;
+}
+
+.certificate-font-modern-semibold {
+    font-family: 'Source Sans Pro', sans-serif;
+    font-weight: 600;
+}
+
+/* Fuentes de respaldo del sistema */
+.certificate-font-system {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+.certificate-font-mono {
+    font-family: 'Courier New', Courier, monospace;
+}
+
+/* Tamaños de fuente estándar */
+.certificate-text-xs { font-size: 0.75rem; }
+.certificate-text-sm { font-size: 0.875rem; }
+.certificate-text-base { font-size: 1rem; }
+.certificate-text-lg { font-size: 1.125rem; }
+.certificate-text-xl { font-size: 1.25rem; }
+.certificate-text-2xl { font-size: 1.5rem; }
+.certificate-text-3xl { font-size: 1.875rem; }
+.certificate-text-4xl { font-size: 2.25rem; }
+
+/* Estilos de texto */
+.certificate-text-center { text-align: center; }
+.certificate-text-left { text-align: left; }
+.certificate-text-right { text-align: right; }
+.certificate-text-justify { text-align: justify; }
+
+.certificate-text-uppercase { text-transform: uppercase; }
+.certificate-text-lowercase { text-transform: lowercase; }
+.certificate-text-capitalize { text-transform: capitalize; }
+
+.certificate-text-bold { font-weight: bold; }
+.certificate-text-semibold { font-weight: 600; }
+.certificate-text-normal { font-weight: normal; }
+.certificate-text-light { font-weight: 300; }
+
+/* Colores de texto para certificados */
+.certificate-text-primary { color: #2c3e50; }
+.certificate-text-secondary { color: #34495e; }
+.certificate-text-accent { color: #3498db; }
+.certificate-text-highlight { color: #e74c3c; }
+.certificate-text-muted { color: #7f8c8d; }
+.certificate-text-dark { color: #1a252f; }
+.certificate-text-light { color: #ecf0f1; }

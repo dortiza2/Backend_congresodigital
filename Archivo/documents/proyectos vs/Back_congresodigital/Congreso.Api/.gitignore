@@ -1,0 +1,17 @@
+# Build outputs
+bin/
+obj/
+
+# Logs
+logs/
+*.log
+
+# Secrets
+.env*
+cookies.txt
+cookies_after_logout.txt
+
+# Artifacts
+*.dump
+*.bak
+*.tmp

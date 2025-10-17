@@ -1,0 +1,151 @@
+name: API Deploy
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'desarrollo/Congreso.Api/**'
+      - '.github/workflows/api-deploy.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'desarrollo/Congreso.Api/**'
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  PROJECT_PATH: './desarrollo/Congreso.Api/Congreso.Api.csproj'
+  RENDER_SERVICE_ID: ${{ secrets.RENDER_API_SERVICE_ID }}
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: congreso_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+          
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.PROJECT_PATH }}
+      
+    - name: Build
+      run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore
+      
+    - name: Run tests
+      run: dotnet test ${{ env.PROJECT_PATH }} --configuration Release --no-build --verbosity normal
+      env:
+        DB_CONNECTION_STRING: Host=localhost;Port=5432;Database=congreso_test;Username=test_user;Password=test_password
+        JWT_SECRET_KEY: test-secret-key
+        
+    - name: Generate test report
+      if: always()
+      uses: dorny/test-reporter@v1
+      with:
+        name: API Test Results
+        path: '**/TestResults/*.trx'
+        reporter: dotnet-trx
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: api-build
+        path: |
+          desarrollo/Congreso.Api/bin/Release/
+          desarrollo/Congreso.Api/wwwroot/
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Publish application
+      run: |
+        dotnet restore ${{ env.PROJECT_PATH }}
+        dotnet publish ${{ env.PROJECT_PATH }} -c Release -o ./publish
+        
+    - name: Create deployment package
+      run: |
+        cd publish
+        zip -r ../api-deployment.zip .
+        
+    - name: Upload deployment package
+      uses: actions/upload-artifact@v3
+      with:
+        name: api-deployment
+        path: api-deployment.zip
+        
+    - name: Deploy to Render
+      env:
+        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      run: |
+        curl -X POST \
+          -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+          -H "Content-Type: application/json" \
+          -d '{"clearCache": "clear"}' \
+          https://api.render.com/v1/services/${{ env.RENDER_SERVICE_ID }}/deploys
+          
+    - name: Wait for deployment
+      run: |
+        echo "Waiting for deployment to complete..."
+        sleep 30
+        
+    - name: Health check
+      run: |
+        response=$(curl -s -o /dev/null -w "%{http_code}" https://api.congreso.umg.edu/healthz)
+        if [ $response -ne 200 ]; then
+          echo "Health check failed with status: $response"
+          exit 1
+        fi
+        echo "Health check passed with status: $response"
+        
+    - name: Notify success
+      if: success()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        text: "✅ API deployment successful!"
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        
+    - name: Notify failure
+      if: failure()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        text: "❌ API deployment failed!"
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}

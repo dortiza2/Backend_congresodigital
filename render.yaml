@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: congreso-api
+    env: docker
+    dockerfilePath: ./Archivo/Congreso.Api/Dockerfile
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      # Usa EITHER DATABASE_URL or the granular DB_* values
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: 5432
+      - key: DB_NAME
+        value: congreso
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      # JWT
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: JWT_ISSUER
+        value: https://api.congreso.umg.edu
+      - key: JWT_AUDIENCE
+        value: https://congreso.umg.edu
+      # SMTP
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        sync: false
+      # Observability (optional)
+      - key: PROMETHEUS_ENABLED
+        value: true
+      - key: HEALTH_CHECK_INTERVAL
+        value: 60
+    healthCheckPath: /healthz
+    autoDeploy: true
+    plan: starter

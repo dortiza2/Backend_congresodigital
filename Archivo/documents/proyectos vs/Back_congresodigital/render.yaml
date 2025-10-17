@@ -1,0 +1,70 @@
+services:
+  # Backend API .NET
+  - type: web
+    name: congreso-api
+    env: docker
+    dockerfilePath: ./desarrollo/Congreso.Api/Dockerfile
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: DB_CONNECTION_STRING
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: JWT_ISSUER
+        value: https://api.congreso.umg.edu
+      - key: JWT_AUDIENCE
+        value: https://congreso.umg.edu
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        sync: false
+      - key: PROMETHEUS_ENABLED
+        value: true
+      - key: HEALTH_CHECK_INTERVAL
+        value: 60
+    healthCheckPath: /healthz
+    buildCommand: dotnet publish -c Release -o out
+    startCommand: cd out && dotnet Congreso.Api.dll
+    autoDeploy: false
+    plan: starter
+    
+  # Frontend Next.js
+  - type: web
+    name: congreso-frontend
+    env: node
+    buildCommand: |
+      cd desarrollo/landing
+      npm ci
+      npm run build
+    startCommand: |
+      cd desarrollo/landing
+      npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://api.congreso.umg.edu
+      - key: NEXT_PUBLIC_API_URL
+        value: https://api.congreso.umg.edu
+      - key: NEXTAUTH_URL
+        value: https://congreso.umg.edu
+      - key: NEXTAUTH_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: NEXT_PUBLIC_ENABLE_GOOGLE
+        value: true
+    healthCheckPath: /
+    autoDeploy: false
+    plan: starter
