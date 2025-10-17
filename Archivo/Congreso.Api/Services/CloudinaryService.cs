@@ -74,8 +74,7 @@ public class CloudinaryService : ICloudinaryService
                     .Width(1920)
                     .Height(1080),
                 UseFilename = true,
-                UniqueFilename = false,
-                ResourceType = ResourceType.Image
+                UniqueFilename = false
             };
 
             _logger.LogInformation($"Uploading image to Cloudinary: {file.FileName} in folder {folder}");

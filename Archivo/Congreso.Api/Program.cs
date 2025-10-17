@@ -487,6 +487,22 @@ try
     db.Database.Migrate();
     Console.WriteLine($"[DB] Migraciones aplicadas al arranque. Entorno: {app.Environment.EnvironmentName}");
 
+    // Seeder mínimo en producción si SEED_MINIMAL=true
+    try
+    {
+        var seedFlag = Environment.GetEnvironmentVariable("SEED_MINIMAL");
+        if (!string.IsNullOrWhiteSpace(seedFlag) && string.Equals(seedFlag, "true", StringComparison.OrdinalIgnoreCase))
+        {
+            var hasher = scope.ServiceProvider.GetRequiredService<Congreso.Api.Services.IPasswordHasher>();
+            Congreso.Api.MinimalProductionSeeder.SeedAsync(db, hasher).GetAwaiter().GetResult();
+            Console.WriteLine("[SeedMinimal] Ejecutado correctamente en arranque.");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[SeedMinimal] Error durante seeding mínimo: {ex.Message}");
+    }
+
     // Asegurar tabla para DataProtectionKeys si aún no existe (sin requerir nueva migración)
     try
     {

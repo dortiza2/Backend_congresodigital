@@ -61,7 +61,7 @@ public class ImagesController : ControllerBase
                 width = result.Width,
                 height = result.Height,
                 size = result.Bytes,
-                folder = result.Folder,
+                folder = folder,
                 createdAt = result.CreatedAt
             };
 
@@ -108,7 +108,7 @@ public class ImagesController : ControllerBase
                 width = result.Width,
                 height = result.Height,
                 size = result.Bytes,
-                folder = result.Folder,
+                folder = folder,
                 createdAt = result.CreatedAt
             });
 
