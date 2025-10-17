@@ -392,170 +392,171 @@ public class AuthController : ControllerBase
         var emailDomain = dto.Email.Split('@').LastOrDefault();
         var isUmgEmail = !string.IsNullOrEmpty(emailDomain) && emailDomain.Equals("umg.edu.gt", StringComparison.OrdinalIgnoreCase);
 
-        // Use explicit transaction for better control
-        using var transaction = await _db.Database.BeginTransactionAsync();
+        // Envolver toda la unidad de trabajo en la ExecutionStrategy para soportar reintentos
+        var strategy = _db.Database.CreateExecutionStrategy();
+        User? user = null;
+
         try
         {
-            // Set organization info without database lookup for now
-            Guid? orgId = null;
-            string orgName = "Externo";
-            
-            if (isUmgEmail)
+            await strategy.ExecuteAsync(async () =>
             {
-                orgName = "Universidad Mariano Gálvez";
-            }
-            else if (!string.IsNullOrEmpty(dto.Institution))
-            {
-                orgName = dto.Institution;
-            }
-
-            // Crear nuevo usuario
-            var user = new User
-            {
-                Id = Guid.NewGuid(),
-                Email = dto.Email,
-                FullName = dto.FullName.Trim(),
-                IsUmg = isUmgEmail,
-                OrgId = orgId,
-                OrgName = orgName,
-                Status = "ACTIVE",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
-                IsActive = true
-            };
-
-            _logger.LogInformation("Creando usuario para email: {Email}", dto.Email);
-            
-            // Crear usuario
-            _db.Users.Add(user);
-            _logger.LogInformation("Usuario agregado al contexto con ID: {UserId}", user.Id);
-            
-            // Guardar usuario primero
-            _logger.LogInformation("Guardando usuario en la base de datos...");
-            await _db.SaveChangesAsync();
-            _logger.LogInformation("Usuario guardado exitosamente");
-
-            // El rol STUDENT se asigna automáticamente por el trigger de la base de datos
-            // cuando se crea el StudentAccount, no necesitamos asignarlo manualmente
-
-            // Crear perfil de estudiante usando SQL directo para evitar problemas con EF
-            var carnet = ExtractStudentIdFromEmail(dto.Email);
-            _logger.LogInformation("Carnet extraído del email: {Carnet}", carnet);
-            
-            _logger.LogInformation("Creando perfil de estudiante...");
-            var studentAccount = new StudentAccount
-            {
-                UserId = user.Id,
-                Carnet = carnet,
-                Career = "Por definir",
-                CohortYear = DateTime.Now.Year,
-                Organization = dto.Institution
-            };
-
-            _db.StudentAccounts.Add(studentAccount);
-            await _db.SaveChangesAsync();
-            
-            _logger.LogInformation("Usuario registrado exitosamente");
-
-            // Commit the transaction
-            await transaction.CommitAsync();
-            _logger.LogInformation("Transacción confirmada exitosamente");
-
-            // Enviar email de confirmación de registro
-            try
-            {
-                // Verificar si el usuario tiene inscripciones
-                var hasEnrollments = await _db.Enrollments
-                    .AnyAsync(e => e.UserId == user.Id);
-
-                // Obtener URL base del frontend desde configuración
-                var frontBaseUrl = _configuration["FRONT_BASE_URL"] ?? "http://localhost:3000";
-
-                var registrationData = new RegistrationConfirmationEmail
+                await using var transaction = await _db.Database.BeginTransactionAsync();
+                try
                 {
-                    UserId = user.Id,
-                    UserEmail = user.Email,
-                    FullName = user.FullName,
-                    IsUmg = user.IsUmg,
-                    OrgName = user.OrgName,
-                    HasEnrollments = hasEnrollments,
-                    FrontBaseUrl = frontBaseUrl
-                };
+                    // Set organization info sin lookup adicional
+                    Guid? orgId = null;
+                    string orgName = "Externo";
+                    if (isUmgEmail)
+                    {
+                        orgName = "Universidad Mariano Gálvez";
+                    }
+                    else if (!string.IsNullOrEmpty(dto.Institution))
+                    {
+                        orgName = dto.Institution;
+                    }
 
-                var emailSent = await _emailService.SendRegistrationConfirmationAsync(registrationData);
-                if (emailSent)
-                {
-                    _logger.LogInformation("Email de confirmación enviado exitosamente a {Email}", user.Email);
+                    // Crear nuevo usuario
+                    user = new User
+                    {
+                        Id = Guid.NewGuid(),
+                        Email = dto.Email,
+                        FullName = dto.FullName.Trim(),
+                        IsUmg = isUmgEmail,
+                        OrgId = orgId,
+                        OrgName = orgName,
+                        Status = "ACTIVE",
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow,
+                        IsActive = true
+                    };
+
+                    _logger.LogInformation("Creando usuario para email: {Email}", dto.Email);
+
+                    // Crear usuario
+                    _db.Users.Add(user);
+                    _logger.LogInformation("Usuario agregado al contexto con ID: {UserId}", user.Id);
+
+                    // Guardar usuario primero
+                    _logger.LogInformation("Guardando usuario en la base de datos...");
+                    await _db.SaveChangesAsync();
+                    _logger.LogInformation("Usuario guardado exitosamente");
+
+                    // Crear perfil de estudiante
+                    var carnet = ExtractStudentIdFromEmail(dto.Email);
+                    _logger.LogInformation("Carnet extraído del email: {Carnet}", carnet);
+
+                    _logger.LogInformation("Creando perfil de estudiante...");
+                    var studentAccount = new StudentAccount
+                    {
+                        UserId = user.Id,
+                        Carnet = carnet,
+                        Career = "Por definir",
+                        CohortYear = DateTime.Now.Year,
+                        Organization = dto.Institution
+                    };
+
+                    _db.StudentAccounts.Add(studentAccount);
+                    await _db.SaveChangesAsync();
+
+                    _logger.LogInformation("Usuario registrado exitosamente");
+
+                    // Commit
+                    await transaction.CommitAsync();
+                    _logger.LogInformation("Transacción confirmada exitosamente");
                 }
-                else
+                catch
                 {
-                    _logger.LogWarning("No se pudo enviar el email de confirmación a {Email}", user.Email);
-                }
-            }
-            catch (Exception emailEx)
-            {
-                _logger.LogError(emailEx, "Error al enviar email de confirmación a {Email}", user.Email);
-                // No fallar el registro por error de email
-            }
-
-            // Crear claims para la cookie de autenticación
-            var userRoles = new[] { "STUDENT" };
-            var roleLevel = 0;
-            
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Name, user.FullName),
-                new Claim("roleLevel", roleLevel.ToString())
-            };
-
-            // Agregar roles como claims
-            foreach (var role in userRoles)
-            {
-                claims.Add(new Claim(ClaimTypes.Role, role));
-            }
-
-            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
-
-            // Configurar propiedades de autenticación
-            var authProperties = new AuthenticationProperties
-            {
-                IsPersistent = true,
-                ExpiresUtc = DateTimeOffset.UtcNow.AddHours(24)
-            };
-
-            // Iniciar sesión con cookie
-            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, claimsPrincipal, authProperties);
-            
-            return Ok(new
-            {
-                message = "Usuario registrado exitosamente",
-                user = new 
-                { 
-                    user.Id, 
-                    user.Email, 
-                    user.FullName,
-                    user.IsUmg,
-                    user.OrgName,
-                    roles = userRoles,
-                    roleLevel = roleLevel
+                    try { await transaction.RollbackAsync(); } catch { }
+                    throw;
                 }
             });
         }
         catch (Exception ex)
         {
-            // Rollback the transaction
-            await transaction.RollbackAsync();
-            _logger.LogError(ex, "Error al registrar usuario para {Email}. Transacción revertida. Detalles: {Message}", dto.Email, ex.Message);
+            _logger.LogError(ex, "Error al registrar usuario para {Email}. Detalles: {Message}", dto.Email, ex.Message);
             if (ex.InnerException != null)
             {
                 _logger.LogError("Inner exception: {InnerMessage}", ex.InnerException.Message);
             }
             return StatusCode(500, new { message = "Error interno del servidor", details = ex.Message });
         }
+
+        // Enviar email de confirmación (fuera de la transacción y fuera de los reintentos)
+        try
+        {
+            var hasEnrollments = await _db.Enrollments.AnyAsync(e => e.UserId == user!.Id);
+            var frontBaseUrl = _configuration["FRONT_BASE_URL"] ?? "http://localhost:3000";
+
+            var registrationData = new RegistrationConfirmationEmail
+            {
+                UserId = user.Id,
+                UserEmail = user.Email,
+                FullName = user.FullName,
+                IsUmg = user.IsUmg,
+                OrgName = user.OrgName,
+                HasEnrollments = hasEnrollments,
+                FrontBaseUrl = frontBaseUrl
+            };
+
+            var emailSent = await _emailService.SendRegistrationConfirmationAsync(registrationData);
+            if (emailSent)
+            {
+                _logger.LogInformation("Email de confirmación enviado exitosamente a {Email}", user.Email);
+            }
+            else
+            {
+                _logger.LogWarning("No se pudo enviar el email de confirmación a {Email}", user.Email);
+            }
+        }
+        catch (Exception emailEx)
+        {
+            _logger.LogError(emailEx, "Error al enviar email de confirmación a {Email}", user?.Email);
+            // No fallar el registro por error de email
+        }
+
+        // Crear claims para la cookie de autenticación y devolver respuesta
+        var userRoles = new[] { "STUDENT" };
+        var roleLevel = 0;
+
+        var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.NameIdentifier, user!.Id.ToString()),
+            new Claim(ClaimTypes.Email, user.Email),
+            new Claim(ClaimTypes.Name, user.FullName),
+            new Claim("roleLevel", roleLevel.ToString())
+        };
+
+        foreach (var role in userRoles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
+
+        var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
+
+        var authProperties = new AuthenticationProperties
+        {
+            IsPersistent = true,
+            ExpiresUtc = DateTimeOffset.UtcNow.AddHours(24)
+        };
+
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, claimsPrincipal, authProperties);
+
+        return Ok(new
+        {
+            message = "Usuario registrado exitosamente",
+            user = new
+            {
+                user!.Id,
+                user.Email,
+                user.FullName,
+                user.IsUmg,
+                user.OrgName,
+                roles = userRoles,
+                roleLevel = roleLevel
+            }
+        });
     }
 
     [Authorize]
