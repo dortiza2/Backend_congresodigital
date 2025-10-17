@@ -190,6 +190,9 @@ builder.Services.AddSingleton<Congreso.Api.Services.IEmailLogService, Congreso.A
 // Old QR metrics collector - replaced by Infrastructure.MetricsCollector
 builder.Services.AddSingleton<Congreso.Api.Services.IMetricsCollector, Congreso.Api.Services.MetricsCollector>();
 
+// NUEVO: Agregar servicio de Cloudinary
+builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
+
 // Add new services for user management and admin functionality
 builder.Services.AddScoped<Congreso.Api.Services.IUserService, Congreso.Api.Services.UserService>();
 builder.Services.AddScoped<Congreso.Api.Services.IStaffService, Congreso.Api.Services.StaffService>();
