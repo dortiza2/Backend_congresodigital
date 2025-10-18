@@ -1,0 +1,7 @@
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Fri, 17 Oct 2025 22:20:49 GMT
+Server: Kestrel
+Transfer-Encoding: chunked
+
+{"authenticated":true,"name":"Dev Local","email":"dev@example.com","user_id":"8d2e6a28-7f5c-4b1b-9b52-2c2b1b3f2f2a","claims":{"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier":"8d2e6a28-7f5c-4b1b-9b52-2c2b1b3f2f2a","http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress":"dev@example.com","name":"Dev Local","http://schemas.microsoft.com/ws/2008/06/identity/claims/role":"user","nbf":"1760739624","exp":"1760754029","iss":"https://congreso-api.onrender.com","aud":"https://congreso-api.onrender.com"}}

@@ -1,0 +1,71 @@
+/opt/homebrew/Cellar/dotnet/9.0.7/libexec/sdk/9.0.108/Microsoft.Common.CurrentVersion.targets(2413,5): warning MSB3277: Found conflicts between different versions of "Microsoft.EntityFrameworkCore.Relational" that could not be resolved. [/Users/davidortiz/Documents/Proyectos VS/Back_congresodigital/Archivo/Seed.Runner/Seed.Runner.csproj]
+/opt/homebrew/Cellar/dotnet/9.0.7/libexec/sdk/9.0.108/Microsoft.Common.CurrentVersion.targets(2413,5): warning MSB3277: There was a conflict between "Microsoft.EntityFrameworkCore.Relational, Version=9.0.1.0, Culture=neutral, PublicKeyToken=adb9793829ddae60" and "Microsoft.EntityFrameworkCore.Relational, Version=9.0.8.0, Culture=neutral, PublicKeyToken=adb9793829ddae60". [/Users/davidortiz/Documents/Proyectos VS/Back_congresodigital/Archivo/Seed.Runner/Seed.Runner.csproj]
+/opt/homebrew/Cellar/dotnet/9.0.7/libexec/sdk/9.0.108/Microsoft.Common.CurrentVersion.targets(2413,5): warning MSB3277:     "Microsoft.EntityFrameworkCore.Relational, Version=9.0.1.0, Culture=neutral, PublicKeyToken=adb9793829ddae60" was chosen because it was primary and "Microsoft.EntityFrameworkCore.Relational, Version=9.0.8.0, Culture=neutral, PublicKeyToken=adb9793829ddae60" was not. [/Users/davidortiz/Documents/Proyectos VS/Back_congresodigital/Archivo/Seed.Runner/Seed.Runner.csproj]
+/opt/homebrew/Cellar/dotnet/9.0.7/libexec/sdk/9.0.108/Microsoft.Common.CurrentVersion.targets(2413,5): warning MSB3277:     References which depend on "Microsoft.EntityFrameworkCore.Relational, Version=9.0.1.0, Culture=neutral, PublicKeyToken=adb9793829ddae60" [/Users/davidortiz/.nuget/packages/microsoft.entityframeworkcore.relational/9.0.1/lib/net8.0/Microsoft.EntityFrameworkCore.Relational.dll]. [/Users/davidortiz/Documents/Proyectos VS/Back_congresodigital/Archivo/Seed.Runner/Seed.Runner.csproj]
+/opt/homebrew/Cellar/dotnet/9.0.7/libexec/sdk/9.0.108/Microsoft.Common.CurrentVersion.targets(2413,5): warning MSB3277:         /Users/davidortiz/.nuget/packages/microsoft.entityframeworkcore.relational/9.0.1/lib/net8.0/Microsoft.EntityFrameworkCore.Relational.dll [/Users/davidortiz/Documents/Proyectos VS/Back_congresodigital/Archivo/Seed.Runner/Seed.Runner.csproj]
+/opt/homebrew/Cellar/dotnet/9.0.7/libexec/sdk/9.0.108/Microsoft.Common.CurrentVersion.targets(2413,5): warning MSB3277:           Project file item includes which caused reference "/Users/davidortiz/.nuget/packages/microsoft.entityframeworkcore.relational/9.0.1/lib/net8.0/Microsoft.EntityFrameworkCore.Relational.dll". [/Users/davidortiz/Documents/Proyectos VS/Back_congresodigital/Archivo/Seed.Runner/Seed.Runner.csproj]
+/opt/homebrew/Cellar/dotnet/9.0.7/libexec/sdk/9.0.108/Microsoft.Common.CurrentVersion.targets(2413,5): warning MSB3277:             /Users/davidortiz/.nuget/packages/microsoft.entityframeworkcore.relational/9.0.1/lib/net8.0/Microsoft.EntityFrameworkCore.Relational.dll [/Users/davidortiz/Documents/Proyectos VS/Back_congresodigital/Archivo/Seed.Runner/Seed.Runner.csproj]
+/opt/homebrew/Cellar/dotnet/9.0.7/libexec/sdk/9.0.108/Microsoft.Common.CurrentVersion.targets(2413,5): warning MSB3277:     References which depend on or have been unified to "Microsoft.EntityFrameworkCore.Relational, Version=9.0.8.0, Culture=neutral, PublicKeyToken=adb9793829ddae60" []. [/Users/davidortiz/Documents/Proyectos VS/Back_congresodigital/Archivo/Seed.Runner/Seed.Runner.csproj]
+/opt/homebrew/Cellar/dotnet/9.0.7/libexec/sdk/9.0.108/Microsoft.Common.CurrentVersion.targets(2413,5): warning MSB3277:         /Users/davidortiz/Documents/Proyectos VS/Back_congresodigital/Archivo/Congreso.Api/bin/Release/net9.0/Congreso.Api.dll [/Users/davidortiz/Documents/Proyectos VS/Back_congresodigital/Archivo/Seed.Runner/Seed.Runner.csproj]
+/opt/homebrew/Cellar/dotnet/9.0.7/libexec/sdk/9.0.108/Microsoft.Common.CurrentVersion.targets(2413,5): warning MSB3277:           Project file item includes which caused reference "/Users/davidortiz/Documents/Proyectos VS/Back_congresodigital/Archivo/Congreso.Api/bin/Release/net9.0/Congreso.Api.dll". [/Users/davidortiz/Documents/Proyectos VS/Back_congresodigital/Archivo/Seed.Runner/Seed.Runner.csproj]
+/opt/homebrew/Cellar/dotnet/9.0.7/libexec/sdk/9.0.108/Microsoft.Common.CurrentVersion.targets(2413,5): warning MSB3277:             /Users/davidortiz/Documents/Proyectos VS/Back_congresodigital/Archivo/Congreso.Api/bin/Release/net9.0/Congreso.Api.dll [/Users/davidortiz/Documents/Proyectos VS/Back_congresodigital/Archivo/Seed.Runner/Seed.Runner.csproj]
+[SeedMinimal] Iniciando seeding mínimo (producción)...
+Error en Seed.Runner: System.IO.FileNotFoundException: Could not load file or assembly 'Microsoft.EntityFrameworkCore.Relational, Version=9.0.8.0, Culture=neutral, PublicKeyToken=adb9793829ddae60'. The system cannot find the file specified.
+
+File name: 'Microsoft.EntityFrameworkCore.Relational, Version=9.0.8.0, Culture=neutral, PublicKeyToken=adb9793829ddae60'
+   at Congreso.Api.Data.CongresoDbContext.OnModelCreating(ModelBuilder modelBuilder)
+   at Microsoft.EntityFrameworkCore.Infrastructure.ModelCustomizer.Customize(ModelBuilder modelBuilder, DbContext context)
+   at Microsoft.EntityFrameworkCore.Infrastructure.ModelSource.CreateModel(DbContext context, IConventionSetBuilder conventionSetBuilder, ModelDependencies modelDependencies)
+   at Microsoft.EntityFrameworkCore.Infrastructure.ModelSource.CreateModel(DbContext context, ModelCreationDependencies modelCreationDependencies, Boolean designTime)
+   at Microsoft.EntityFrameworkCore.Infrastructure.ModelSource.GetModel(DbContext context, ModelCreationDependencies modelCreationDependencies, Boolean designTime)
+   at Microsoft.EntityFrameworkCore.Internal.DbContextServices.CreateModel(Boolean designTime)
+   at Microsoft.EntityFrameworkCore.Internal.DbContextServices.get_Model()
+   at Microsoft.EntityFrameworkCore.Infrastructure.EntityFrameworkServicesBuilder.<>c.<TryAddCoreServices>b__8_4(IServiceProvider p)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitFactory(FactoryCallSite factoryCallSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSiteMain(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitScopeCache(ServiceCallSite callSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSiteMain(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitScopeCache(ServiceCallSite callSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSiteMain(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitScopeCache(ServiceCallSite callSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSiteMain(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitScopeCache(ServiceCallSite callSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSiteMain(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitScopeCache(ServiceCallSite callSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSiteMain(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitScopeCache(ServiceCallSite callSite, RuntimeResolverContext context)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.Resolve(ServiceCallSite callSite, ServiceProviderEngineScope scope)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.DynamicServiceProviderEngine.<>c__DisplayClass2_0.<RealizeService>b__0(ServiceProviderEngineScope scope)
+   at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+   at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+   at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService[T](IServiceProvider provider)
+   at Microsoft.EntityFrameworkCore.DbContext.get_DbContextDependencies()
+   at Microsoft.EntityFrameworkCore.DbContext.get_ContextServices()
+   at Microsoft.EntityFrameworkCore.DbContext.get_Model()
+   at Microsoft.EntityFrameworkCore.Internal.InternalDbSet`1.get_EntityType()
+   at Microsoft.EntityFrameworkCore.Internal.InternalDbSet`1.CheckState()
+   at Microsoft.EntityFrameworkCore.Internal.InternalDbSet`1.get_EntityQueryable()
+   at Microsoft.EntityFrameworkCore.Internal.InternalDbSet`1.System.Linq.IQueryable.get_Provider()
+   at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ExecuteAsync[TSource,TResult](MethodInfo operatorMethodInfo, IQueryable`1 source, Expression expression, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ExecuteAsync[TSource,TResult](MethodInfo operatorMethodInfo, IQueryable`1 source, LambdaExpression expression, CancellationToken cancellationToken)
+   at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync[TSource](IQueryable`1 source, Expression`1 predicate, CancellationToken cancellationToken)
+   at Congreso.Api.MinimalProductionSeeder.SeedAsync(CongresoDbContext db, IPasswordHasher hasher) in /Users/davidortiz/Documents/Proyectos VS/Back_congresodigital/Archivo/Congreso.Api/MinimalProductionSeeder.cs:line 28
+   at Program.Main(String[] args) in /Users/davidortiz/Documents/Proyectos VS/Back_congresodigital/Archivo/Seed.Runner/Program.cs:line 56

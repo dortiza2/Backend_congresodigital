@@ -381,6 +381,32 @@ namespace Congreso.Api.Controllers
             }
         }
 
+        // Alias: GET /api/users/me/enrollments
+        [HttpGet("me/enrollments")]
+        [Authorize]
+        public async Task<ActionResult<ApiResponse<List<UserEnrollmentView>>>> GetMyEnrollments()
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                var enrollments = await _userService.GetUserEnrollmentsAsync(currentUserId);
+                return Ok(new ApiResponse<List<UserEnrollmentView>>
+                {
+                    Success = true,
+                    Data = enrollments ?? new List<UserEnrollmentView>(),
+                    Message = "User enrollments retrieved successfully"
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new ApiResponse<List<UserEnrollmentView>>
+                {
+                    Success = false,
+                    Message = "error_retrieving_user_enrollments"
+                });
+            }
+        }
+
         [HttpGet("exists/{email}")]
         [AllowAnonymous]
         public async Task<ActionResult<ApiResponse<bool>>> CheckUserExists(string email)

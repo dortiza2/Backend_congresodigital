@@ -108,3 +108,46 @@ Una vez desplegado, verifica:
 - Si tu base de datos Render es "Managed PostgreSQL", usa las credenciales y `DATABASE_URL` que te provee Render.
 - Evita seeds agresivos en producción. Usa `SEED_MINIMAL=false` y/o seeds idempotentes.
 - Si empleas CDN/Cloudinary, valida que las variables estén bien definidas antes de habilitar endpoints relacionados.
+
+---
+
+## 6) Despliegue de Congreso.Api (Render)
+
+Este proyecto minimal expone health checks, endpoints públicos de actividades y un emisor de JWT para pruebas. Si deseas desplegarlo en Render como un servicio separado, usa esta guía.
+
+### A. Comandos de build y start
+- Build Command:
+  - `dotnet restore` \
+    `dotnet build Archivo/Congreso.Api -c Release`
+- Start Command:
+  - `ASPNETCORE_URLS=http://0.0.0.0:$PORT dotnet Archivo/Congreso.Api/bin/Release/net9.0/Congreso.Api.dll`
+
+### B. Variables de entorno (obligatorias)
+- `ASPNETCORE_ENVIRONMENT=Production`
+- `ASPNETCORE_URLS=http://0.0.0.0:$PORT`
+- `DATABASE_URL` (elige UNA forma):
+  - URI: `postgres://USER:PASSWORD@HOST:5432/DB?sslmode=require` (evita saltos de línea en Render)
+  - Key-value (recomendado si tienes problemas con URI):
+    `Host=HOST;Port=5432;Database=DB;Username=USER;Password=PASS;SSL Mode=Require;Trust Server Certificate=true`
+- JWT:
+  - `JWT_ISSUER=https://tu-dominio-o-url-del-servicio`
+  - `JWT_AUDIENCE=https://tu-dominio-o-url-del-servicio`
+  - `JWT_SECRET_KEY` (mínimo 32 bytes/256 bits). Si ves `IDX10720`, usa una clave más larga.
+- CORS (opcional):
+  - `CORS_ORIGINS=https://tus-frontends.com,https://otro-dominio.com`
+
+### C. Endpoints de verificación (smoke tests)
+- Salud general: `curl -i "$RENDER_EXTERNAL_URL/api/health"` (200)
+- Salud BD: `curl -i "$RENDER_EXTERNAL_URL/health/db"` (200)
+- Token de prueba:
+  - `curl -i -X POST "$RENDER_EXTERNAL_URL/api/auth/token" -H 'Content-Type: application/json' -d '{"Email":"admin@congreso.com","Name":"Admin Seed","UserId":"550e8400-e29b-41d4-a716-446655440014","Role":"admin"}'`
+- Perfil (protegido):
+  - `curl -s "$RENDER_EXTERNAL_URL/api/auth/token" ... | jq -r .access_token` → exporta `TOKEN`
+  - `curl -i "$RENDER_EXTERNAL_URL/api/profile/me" -H "Authorization: Bearer $TOKEN"`
+- Actividades públicas: `curl -i "$RENDER_EXTERNAL_URL/api/activities/upcoming"`
+
+### D. Problemas comunes
+- `503 Unhealthy` en `/health/db`:
+  - Verifica que `DATABASE_URL` no tenga saltos de línea y que incluya `sslmode=require` (o usa el formato key=value anterior).
+- `500` al emitir token: suele ser `JWT_SECRET_KEY` demasiado corta (HS256 requiere ≥ 256 bits).
+- CORS bloqueando llamadas desde el frontend: define `CORS_ORIGINS` con los dominios finales (sin comodines en producción).

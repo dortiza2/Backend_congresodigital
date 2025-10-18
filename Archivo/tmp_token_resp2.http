@@ -1,0 +1,7 @@
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Fri, 17 Oct 2025 22:20:28 GMT
+Server: Kestrel
+Transfer-Encoding: chunked
+
+{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4ZDJlNmEyOC03ZjVjLTRiMWItOWI1Mi0yYzJiMWIzZjJmMmEiLCJlbWFpbCI6ImRldkBleGFtcGxlLmNvbSIsIm5hbWUiOiJEZXYgTG9jYWwiLCJyb2xlIjoidXNlciIsIm5iZiI6MTc2MDczOTYyNCwiZXhwIjoxNzYwNzU0MDI5LCJpc3MiOiJodHRwczovL2NvbmdyZXNvLWFwaS5vbnJlbmRlci5jb20iLCJhdWQiOiJodHRwczovL2NvbmdyZXNvLWFwaS5vbnJlbmRlci5jb20ifQ.DMjtOx3J_6esY7Y5LAaUvtUesyBulS27GJFradSwB0o","token_type":"Bearer","expires_in":14400}

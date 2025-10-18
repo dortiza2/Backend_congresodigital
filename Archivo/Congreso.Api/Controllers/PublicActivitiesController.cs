@@ -8,7 +8,7 @@ using Congreso.Api.DTOs;
 namespace Congreso.Api.Controllers;
 
 [ApiController]
-[Route("api/public/activities")]
+[Route("api/activities")]
 public class PublicActivitiesController : ControllerBase
 {
     private readonly NpgsqlDataSource _ds;
@@ -20,8 +20,6 @@ public class PublicActivitiesController : ControllerBase
     }
 
     [HttpGet]
-    [HttpGet("/api/activities")] // Alias público
-    [HttpGet("/api/activities/public")] // Alias público adicional
     public async Task<IActionResult> List([FromQuery] string? kinds = null)
     {
         // Build dynamic WHERE based on kinds CSV per contract
@@ -54,7 +52,7 @@ public class PublicActivitiesController : ControllerBase
                 s_speaker.role_title AS speaker_role_title,
                 s_speaker.company AS speaker_company,
                 s_speaker.avatar_url AS speaker_avatar_url
-            FROM public.activities a
+            FROM public.vw_api_activities a
             LEFT JOIN LATERAL (
                 SELECT s.id, s.full_name, s.role_title, s.company, s.avatar_url
                 FROM public.activity_speakers asp
@@ -72,38 +70,50 @@ public class PublicActivitiesController : ControllerBase
             var items = new List<ActivityDto>();
             await using var cmd = _ds.CreateCommand(sql);
             await using var rd = await cmd.ExecuteReaderAsync();
+
+            // Compute ordinals defensively
+            int ordId = TryGetOrdinal(rd, "id");
+            int ordTitle = TryGetOrdinal(rd, "title");
+            int ordLocation = TryGetOrdinal(rd, "location");
+            int ordStartsAt = TryGetOrdinal(rd, "starts_at", fallback: "start_time");
+            int ordEndsAt = TryGetOrdinal(rd, "ends_at", fallback: "end_time");
+            int ordCapacity = TryGetOrdinal(rd, "capacity");
+            // published may not exist in some schemas; fallback to is_active
+            int ordPublished = TryGetOrdinal(rd, "published");
+            if (ordPublished < 0) ordPublished = TryGetOrdinal(rd, "is_active");
+            int ordTypeOut = TryGetOrdinal(rd, "activity_type_out", fallback: "activity_type");
+
+            int ordSpeakerId = TryGetOrdinal(rd, "speaker_id");
+            int ordSpeakerName = TryGetOrdinal(rd, "speaker_name");
+            int ordSpeakerRoleTitle = TryGetOrdinal(rd, "speaker_role_title");
+            int ordSpeakerCompany = TryGetOrdinal(rd, "speaker_company");
+            int ordSpeakerAvatarUrl = TryGetOrdinal(rd, "speaker_avatar_url");
+
             while (await rd.ReadAsync())
             {
                 // id: activities.id may be uuid or int; output requires string per frontend contract
-                var id = ReadIdAsString(rd, 0) ?? string.Empty;
+                var id = ReadIdAsString(rd, ordId) ?? string.Empty;
 
-                var title = rd.IsDBNull(1) ? string.Empty : rd.GetString(1);
-                var location = rd.IsDBNull(2) ? null : rd.GetString(2);
-                var startTime = rd.IsDBNull(3) ? (DateTime?)null : rd.GetDateTime(3);
-                var endTime = rd.IsDBNull(4) ? (DateTime?)null : rd.GetDateTime(4);
-                var capacity = rd.IsDBNull(5) ? (int?)0 : SafeGetInt32(rd, 5, defaultValue: 0);
-                var published = !rd.IsDBNull(6) && SafeGetBoolean(rd, 6, defaultValue: true);
-                var activityType = rd.IsDBNull(7) ? "activity" : rd.GetString(7);
+                var title = ReadString(rd, ordTitle) ?? string.Empty;
+                var location = ReadString(rd, ordLocation);
+                var startTime = ReadDateTime(rd, ordStartsAt);
+                var endTime = ReadDateTime(rd, ordEndsAt);
+                var capacity = ReadInt(rd, ordCapacity) ?? 0;
+                var published = SafeGetBoolean(rd, ordPublished, defaultValue: true);
+                var activityType = ReadString(rd, ordTypeOut) ?? "activity";
 
                 // Speaker block (nullable)
                 SpeakerDto? speaker = null;
                 try
                 {
-                    var ordSpeakerId = 8;
-                    var ordSpeakerName = 9;
-                    var ordSpeakerRoleTitle = 10;
-                    var ordSpeakerCompany = 11;
-                    var ordSpeakerAvatarUrl = 12;
-
-                    bool hasSpeaker = !rd.IsDBNull(ordSpeakerId) || !rd.IsDBNull(ordSpeakerName);
+                    bool hasSpeaker = (ordSpeakerId >= 0 && !rd.IsDBNull(ordSpeakerId)) || (ordSpeakerName >= 0 && !rd.IsDBNull(ordSpeakerName));
                     if (hasSpeaker)
                     {
                         var sid = ReadIdAsString(rd, ordSpeakerId) ?? string.Empty;
-
-                        var sname = rd.IsDBNull(ordSpeakerName) ? string.Empty : rd.GetString(ordSpeakerName);
-                        var srole = rd.IsDBNull(ordSpeakerRoleTitle) ? null : rd.GetString(ordSpeakerRoleTitle);
-                        var scompany = rd.IsDBNull(ordSpeakerCompany) ? null : rd.GetString(ordSpeakerCompany);
-                        var savatar = rd.IsDBNull(ordSpeakerAvatarUrl) ? null : rd.GetString(ordSpeakerAvatarUrl);
+                        var sname = ReadString(rd, ordSpeakerName) ?? string.Empty;
+                        var srole = ReadString(rd, ordSpeakerRoleTitle);
+                        var scompany = ReadString(rd, ordSpeakerCompany);
+                        var savatar = ReadString(rd, ordSpeakerAvatarUrl);
                         if (string.IsNullOrWhiteSpace(savatar)) savatar = null;
 
                         speaker = new SpeakerDto(
@@ -124,7 +134,7 @@ public class PublicActivitiesController : ControllerBase
 
                 // EnrolledCount and AvailableSpots per contract (temporary values)
                 int enrolledCount = 0;
-                int availableSpots = Math.Max((capacity ?? 0) - enrolledCount, 0);
+                int availableSpots = Math.Max((capacity) - enrolledCount, 0);
 
                 items.Add(new ActivityDto(
                     Id: id,
@@ -133,7 +143,7 @@ public class PublicActivitiesController : ControllerBase
                     Location: string.IsNullOrWhiteSpace(location) ? null : location.Trim(),
                     StartTime: startTime,
                     EndTime: endTime,
-                    Capacity: Math.Max(capacity ?? 0, 0),
+                    Capacity: Math.Max(capacity, 0),
                     Published: published,
                     EnrolledCount: enrolledCount,
                     AvailableSpots: availableSpots,
@@ -154,86 +164,83 @@ public class PublicActivitiesController : ControllerBase
         }
     }
 
-[HttpGet("{id}")]
-    [HttpGet("/api/activities/{id}")] // Alias público
-    [HttpGet("/api/activities/public/{id}")] // Alias público adicional
-public async Task<IActionResult> GetById([FromRoute] string id)
-{
-    if (string.IsNullOrWhiteSpace(id))
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetById([FromRoute] string id)
     {
-        return BadRequest(new { message = "Invalid activity id." });
-    }
-
-        const string sql = @"SELECT * FROM activities WHERE id::text=@id;";
-        await using var cmd = _ds.CreateCommand(sql);
-        cmd.Parameters.AddWithValue("@id", id);
-        await using var rd = await cmd.ExecuteReaderAsync();
-        if (!await rd.ReadAsync()) return NotFound(new { message = "Activity not found", id });
-
-        int ordId = TryGetOrdinal(rd, "id");
-        int ordTitle = TryGetOrdinal(rd, "title");
-        int ordDesc = TryGetOrdinal(rd, "description");
-        int ordLoc = TryGetOrdinal(rd, "location");
-        int ordStartsAt = TryGetOrdinal(rd, "starts_at", fallback: "start_time");
-        int ordEndsAt = TryGetOrdinal(rd, "ends_at", fallback: "end_time");
-        int ordCapacity = TryGetOrdinal(rd, "capacity");
-        int ordIsActive = TryGetOrdinal(rd, "is_active");
-        int ordType = TryGetOrdinal(rd, "activity_type", fallback: "type");
-
-        var dto = new
+        if (string.IsNullOrWhiteSpace(id))
         {
-            id = ReadIdAsString(rd, ordId),
-            activity_type = ReadString(rd, ordType),
-            title = ReadString(rd, ordTitle),
-            description = ReadString(rd, ordDesc),
-            location = ReadString(rd, ordLoc),
-            starts_at = ReadDateTime(rd, ordStartsAt),
-            ends_at = ReadDateTime(rd, ordEndsAt),
-            capacity = ReadInt(rd, ordCapacity),
-            is_active = ordIsActive >= 0 && !rd.IsDBNull(ordIsActive) && rd.GetBoolean(ordIsActive)
-        };
-        return Ok(dto);
-    }
+            return BadRequest(new { message = "Invalid activity id." });
+        }
 
-    [HttpGet("upcoming")]
-    [HttpGet("/api/activities/upcoming")] // Alias público
-    [HttpGet("/api/activities/public/upcoming")] // Alias público adicional
-    public async Task<IActionResult> Upcoming([FromQuery] int take = 10)
-    {
-        const string sql = @"SELECT id, title, start_time
-                             FROM public.vw_public_activities
-                             WHERE start_time IS NOT NULL AND start_time >= now()
-                             ORDER BY start_time ASC, id ASC
-                             LIMIT @take;";
-        try
-        {
-            take = Math.Clamp(take, 1, 50);
+            const string sql = @"SELECT * FROM public.vw_api_activities_full WHERE id::text=@id;";
             await using var cmd = _ds.CreateCommand(sql);
-            cmd.Parameters.AddWithValue("@take", take);
-            var items = new List<object>();
+            cmd.Parameters.AddWithValue("@id", id);
             await using var rd = await cmd.ExecuteReaderAsync();
-            while (await rd.ReadAsync())
+            if (!await rd.ReadAsync()) return NotFound(new { message = "Activity not found", id });
+
+            int ordId = TryGetOrdinal(rd, "id");
+            int ordTitle = TryGetOrdinal(rd, "title");
+            int ordDesc = TryGetOrdinal(rd, "description");
+            int ordLoc = TryGetOrdinal(rd, "location");
+            int ordStartsAt = TryGetOrdinal(rd, "starts_at", fallback: "start_time");
+            int ordEndsAt = TryGetOrdinal(rd, "ends_at", fallback: "end_time");
+            int ordCapacity = TryGetOrdinal(rd, "capacity");
+            int ordIsActive = TryGetOrdinal(rd, "published");
+            if (ordIsActive < 0) ordIsActive = TryGetOrdinal(rd, "is_active");
+            int ordType = TryGetOrdinal(rd, "activity_type", fallback: "type");
+
+            var dto = new
             {
-                items.Add(new
+                id = ReadIdAsString(rd, ordId),
+                activity_type = ReadString(rd, ordType),
+                title = ReadString(rd, ordTitle),
+                description = ReadString(rd, ordDesc),
+                location = ReadString(rd, ordLoc),
+                starts_at = ReadDateTime(rd, ordStartsAt),
+                ends_at = ReadDateTime(rd, ordEndsAt),
+                capacity = ReadInt(rd, ordCapacity),
+                is_active = ordIsActive >= 0 && !rd.IsDBNull(ordIsActive) && rd.GetBoolean(ordIsActive)
+            };
+            return Ok(dto);
+        }
+
+        [HttpGet("upcoming")]
+        public async Task<IActionResult> Upcoming([FromQuery] int take = 10)
+        {
+            const string sql = @"SELECT id, title, start_time
+                                 FROM public.vw_api_activities_upcoming
+                                 WHERE start_time IS NOT NULL AND start_time >= now()
+                                 ORDER BY start_time ASC, id ASC
+                                 LIMIT @take;";
+            try
+            {
+                take = Math.Clamp(take, 1, 50);
+                await using var cmd = _ds.CreateCommand(sql);
+                cmd.Parameters.AddWithValue("@take", take);
+                var items = new List<object>();
+                await using var rd = await cmd.ExecuteReaderAsync();
+                while (await rd.ReadAsync())
                 {
-                    id = rd.IsDBNull(0) ? 0 : rd.GetInt32(0),
-                    title = rd.IsDBNull(1) ? null : rd.GetString(1),
-                    start_time = rd.IsDBNull(2) ? (DateTime?)null : rd.GetDateTime(2)
-                });
+                    items.Add(new
+                    {
+                        id = SafeGetInt32(rd, 0, 0),
+                        title = rd.IsDBNull(1) ? null : rd.GetString(1),
+                        start_time = rd.IsDBNull(2) ? (DateTime?)null : rd.GetDateTime(2)
+                    });
+                }
+                return Ok(new { count = items.Count, items });
             }
-            return Ok(new { count = items.Count, items });
+            catch (NpgsqlException ex)
+            {
+                _logger.LogWarning(ex, "GET /api/activities/upcoming failed. SQL: {Sql}", sql);
+                return Ok(new { count = 0, items = Array.Empty<object>() });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "GET /api/activities/upcoming unexpected error. SQL: {Sql}", sql);
+                return Ok(new { count = 0, items = Array.Empty<object>() });
+            }
         }
-        catch (NpgsqlException ex)
-        {
-            _logger.LogWarning(ex, "GET /api/activities/upcoming failed. SQL: {Sql}", sql);
-            return Ok(new { count = 0, items = Array.Empty<object>() });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "GET /api/activities/upcoming unexpected error. SQL: {Sql}", sql);
-            return Ok(new { count = 0, items = Array.Empty<object>() });
-        }
-    }
 
     private static int TryGetOrdinal(Npgsql.NpgsqlDataReader rd, string name, string? fallback = null)
     {

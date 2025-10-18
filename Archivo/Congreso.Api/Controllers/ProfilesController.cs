@@ -5,6 +5,7 @@ using Congreso.Api.DTOs;
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
 using Swashbuckle.AspNetCore.Annotations;
+using Microsoft.EntityFrameworkCore;
 
 namespace Congreso.Api.Controllers;
 
@@ -133,6 +134,40 @@ public class ProfilesController : ControllerBase
     #endregion
 
     #region Student Profiles
+
+    /// <summary>
+    /// Actualiza el perfil básico del usuario actual (FullName, OrgName)
+    /// </summary>
+    [SwaggerOperation(Summary = "Actualizar mi perfil", Description = "Actualiza los campos permitidos del perfil del usuario autenticado (FullName, OrgName)")]
+    [ProducesResponseType(typeof(object), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    [HttpPut("me")]
+    [HttpPut("/api/profile/me")]
+    public async Task<IActionResult> UpdateMyProfile([FromBody] StudentController.UpdateProfileDto dto, [FromServices] Congreso.Api.Data.CongresoDbContext db)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null)
+            return Unauthorized();
+
+        if (dto == null)
+            return BadRequest(new { message = "Invalid payload" });
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId.Value);
+        if (user == null)
+            return NotFound(new { message = "User not found" });
+
+        if (!string.IsNullOrWhiteSpace(dto.FullName))
+            user.FullName = dto.FullName;
+
+        if (!string.IsNullOrWhiteSpace(dto.OrgName))
+            user.OrgName = dto.OrgName;
+
+        await db.SaveChangesAsync();
+
+        return Ok(new { message = "Profile updated successfully" });
+    }
 
     /// <summary>
     /// Obtiene todos los perfiles de estudiantes (solo staff)

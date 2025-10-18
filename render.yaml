@@ -44,6 +44,6 @@ services:
         value: true
       - key: HEALTH_CHECK_INTERVAL
         value: 60
-    healthCheckPath: /healthz
+    healthCheckPath: /api/health
     autoDeploy: true
     plan: starter
