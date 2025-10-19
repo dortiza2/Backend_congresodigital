@@ -154,14 +154,144 @@ public class PublicActivitiesController : ControllerBase
         }
         catch (NpgsqlException ex)
         {
-            _logger.LogWarning(ex, "GET /api/activities failed. SQL: {Sql}", sql);
-            return Ok(new List<ActivityDto>());
+            // Fallback a tablas base si la vista no existe o falla
+            _logger.LogWarning(ex, "GET /api/activities failed on view, trying fallback tables. SQL: {Sql}", sql);
+            var items = await QueryActivitiesFromFallbackAsync(whereClause);
+            return Ok(items);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "GET /api/activities unexpected error. SQL: {Sql}", sql);
-            return Ok(new List<ActivityDto>());
+            _logger.LogWarning(ex, "GET /api/activities unexpected error on view, trying fallback tables. SQL: {Sql}", sql);
+            var items = await QueryActivitiesFromFallbackAsync(whereClause);
+            return Ok(items);
         }
+    }
+
+    private async Task<List<ActivityDto>> QueryActivitiesFromFallbackAsync(string whereClause)
+    {
+        var items = new List<ActivityDto>();
+        string sqlFallback = $@"
+            SELECT 
+                a.id,
+                a.title,
+                a.location,
+                a.start_time,
+                a.end_time,
+                a.capacity,
+                a.published,
+                CASE
+                    WHEN EXISTS (
+                        SELECT 1 FROM public.activity_tags at
+                        JOIN public.tags t ON t.id = at.tag_id
+                        WHERE at.activity_id = a.id AND LOWER(t.name) IN ('workshop','taller')
+                    ) THEN 'workshop'
+                    WHEN EXISTS (
+                        SELECT 1 FROM public.activity_tags at
+                        JOIN public.tags t ON t.id = at.tag_id
+                        WHERE at.activity_id = a.id AND LOWER(t.name) IN ('competition','competencia')
+                    ) THEN 'competition'
+                    WHEN LOWER(COALESCE((a.activity_type)::text, '')) IN ('talk','charla') THEN 'talk'
+                    ELSE 'activity'
+                END AS activity_type_out,
+                s_speaker.id AS speaker_id,
+                s_speaker.full_name AS speaker_name,
+                s_speaker.role_title AS speaker_role_title,
+                s_speaker.company AS speaker_company,
+                s_speaker.avatar_url AS speaker_avatar_url
+            FROM public.activities a
+            LEFT JOIN LATERAL (
+                SELECT s.id, s.full_name, s.role_title, s.company, s.avatar_url
+                FROM public.activity_speakers asp
+                JOIN public.speakers s ON s.id = asp.speaker_id
+                WHERE asp.activity_id = a.id
+                ORDER BY s.full_name ASC
+                LIMIT 1
+            ) AS s_speaker ON TRUE
+            {whereClause}
+            ORDER BY a.start_time ASC, a.id ASC;";
+
+        try
+        {
+            await using var cmd = _ds.CreateCommand(sqlFallback);
+            await using var rd = await cmd.ExecuteReaderAsync();
+
+            int ordId = TryGetOrdinal(rd, "id");
+            int ordTitle = TryGetOrdinal(rd, "title");
+            int ordLocation = TryGetOrdinal(rd, "location");
+            int ordStartsAt = TryGetOrdinal(rd, "start_time");
+            int ordEndsAt = TryGetOrdinal(rd, "end_time");
+            int ordCapacity = TryGetOrdinal(rd, "capacity");
+            int ordPublished = TryGetOrdinal(rd, "published");
+            if (ordPublished < 0) ordPublished = TryGetOrdinal(rd, "is_active");
+            int ordTypeOut = TryGetOrdinal(rd, "activity_type_out", fallback: "activity_type");
+
+            int ordSpeakerId = TryGetOrdinal(rd, "speaker_id");
+            int ordSpeakerName = TryGetOrdinal(rd, "speaker_name");
+            int ordSpeakerRoleTitle = TryGetOrdinal(rd, "speaker_role_title");
+            int ordSpeakerCompany = TryGetOrdinal(rd, "speaker_company");
+            int ordSpeakerAvatarUrl = TryGetOrdinal(rd, "speaker_avatar_url");
+
+            while (await rd.ReadAsync())
+            {
+                var id = ReadIdAsString(rd, ordId) ?? string.Empty;
+                var title = ReadString(rd, ordTitle) ?? string.Empty;
+                var location = ReadString(rd, ordLocation);
+                var startTime = ReadDateTime(rd, ordStartsAt);
+                var endTime = ReadDateTime(rd, ordEndsAt);
+                var capacity = ReadInt(rd, ordCapacity) ?? 0;
+                var published = SafeGetBoolean(rd, ordPublished, defaultValue: true);
+                var activityType = ReadString(rd, ordTypeOut) ?? "activity";
+
+                SpeakerDto? speaker = null;
+                try
+                {
+                    bool hasSpeaker = (ordSpeakerId >= 0 && !rd.IsDBNull(ordSpeakerId)) || (ordSpeakerName >= 0 && !rd.IsDBNull(ordSpeakerName));
+                    if (hasSpeaker)
+                    {
+                        var sid = ReadIdAsString(rd, ordSpeakerId) ?? string.Empty;
+                        var sname = ReadString(rd, ordSpeakerName) ?? string.Empty;
+                        var srole = ReadString(rd, ordSpeakerRoleTitle);
+                        var scompany = ReadString(rd, ordSpeakerCompany);
+                        var savatar = ReadString(rd, ordSpeakerAvatarUrl);
+                        if (string.IsNullOrWhiteSpace(savatar)) savatar = null;
+
+                        speaker = new SpeakerDto(
+                            Id: sid,
+                            Name: sname,
+                            Bio: null,
+                            Company: scompany,
+                            RoleTitle: srole,
+                            AvatarUrl: savatar,
+                            Links: null
+                        );
+                    }
+                }
+                catch { speaker = null; }
+
+                int enrolledCount = 0;
+                int availableSpots = Math.Max((capacity) - enrolledCount, 0);
+
+                items.Add(new ActivityDto(
+                    Id: id,
+                    Title: string.IsNullOrWhiteSpace(title) ? string.Empty : title.Trim(),
+                    ActivityType: string.IsNullOrWhiteSpace(activityType) ? "activity" : activityType,
+                    Location: string.IsNullOrWhiteSpace(location) ? null : location.Trim(),
+                    StartTime: startTime,
+                    EndTime: endTime,
+                    Capacity: Math.Max(capacity, 0),
+                    Published: published,
+                    EnrolledCount: enrolledCount,
+                    AvailableSpots: availableSpots,
+                    Speaker: speaker
+                ));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "GET /api/activities fallback failed. SQL: {Sql}", sqlFallback);
+        }
+
+        return items;
     }
 
     [HttpGet("{id}")]
@@ -172,6 +302,8 @@ public class PublicActivitiesController : ControllerBase
             return BadRequest(new { message = "Invalid activity id." });
         }
 
+        try
+        {
             const string sql = @"SELECT * FROM public.vw_api_activities_full WHERE id::text=@id;";
             await using var cmd = _ds.CreateCommand(sql);
             cmd.Parameters.AddWithValue("@id", id);
@@ -203,44 +335,117 @@ public class PublicActivitiesController : ControllerBase
             };
             return Ok(dto);
         }
-
-        [HttpGet("upcoming")]
-        public async Task<IActionResult> Upcoming([FromQuery] int take = 10)
+        catch (NpgsqlException ex)
         {
-            const string sql = @"SELECT id, title, start_time
-                                 FROM public.vw_api_activities_upcoming
-                                 WHERE start_time IS NOT NULL AND start_time >= now()
-                                 ORDER BY start_time ASC, id ASC
-                                 LIMIT @take;";
+            // Fallback: consultar directamente la tabla base
+            _logger.LogWarning(ex, "GET /api/activities/{id} view failed, trying fallback tables");
+            const string sql2 = @"
+                SELECT a.id, a.title, a.description, a.location, a.start_time, a.end_time, a.capacity,
+                       COALESCE(a.published, a.is_active) AS is_active,
+                       COALESCE((a.activity_type)::text, '') AS activity_type
+                FROM public.activities a
+                WHERE a.id::text = @id
+                LIMIT 1;";
+            await using var cmd2 = _ds.CreateCommand(sql2);
+            cmd2.Parameters.AddWithValue("@id", id);
+            await using var rd2 = await cmd2.ExecuteReaderAsync();
+            if (!await rd2.ReadAsync()) return NotFound(new { message = "Activity not found", id });
+
+            int ordId2 = TryGetOrdinal(rd2, "id");
+            int ordTitle2 = TryGetOrdinal(rd2, "title");
+            int ordDesc2 = TryGetOrdinal(rd2, "description");
+            int ordLoc2 = TryGetOrdinal(rd2, "location");
+            int ordStartsAt2 = TryGetOrdinal(rd2, "start_time");
+            int ordEndsAt2 = TryGetOrdinal(rd2, "end_time");
+            int ordCapacity2 = TryGetOrdinal(rd2, "capacity");
+            int ordIsActive2 = TryGetOrdinal(rd2, "is_active");
+            int ordType2 = TryGetOrdinal(rd2, "activity_type");
+
+            var dto2 = new
+            {
+                id = ReadIdAsString(rd2, ordId2),
+                activity_type = ReadString(rd2, ordType2),
+                title = ReadString(rd2, ordTitle2),
+                description = ReadString(rd2, ordDesc2),
+                location = ReadString(rd2, ordLoc2),
+                starts_at = ReadDateTime(rd2, ordStartsAt2),
+                ends_at = ReadDateTime(rd2, ordEndsAt2),
+                capacity = ReadInt(rd2, ordCapacity2),
+                is_active = SafeGetBoolean(rd2, ordIsActive2, true)
+            };
+            return Ok(dto2);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "GET /api/activities/{id} unexpected error");
+            return StatusCode(500, new { message = "Unexpected error" });
+        }
+    }
+
+    [HttpGet("upcoming")]
+    public async Task<IActionResult> Upcoming([FromQuery] int take = 10)
+    {
+        const string sql = @"SELECT id, title, start_time
+                             FROM public.vw_api_activities_upcoming
+                             WHERE start_time IS NOT NULL AND start_time >= now()
+                             ORDER BY start_time ASC, id ASC
+                             LIMIT @take;";
+        try
+        {
+            take = Math.Clamp(take, 1, 50);
+            await using var cmd = _ds.CreateCommand(sql);
+            cmd.Parameters.AddWithValue("@take", take);
+            var items = new List<object>();
+            await using var rd = await cmd.ExecuteReaderAsync();
+            while (await rd.ReadAsync())
+            {
+                items.Add(new
+                {
+                    id = SafeGetInt32(rd, 0, 0),
+                    title = rd.IsDBNull(1) ? null : rd.GetString(1),
+                    start_time = rd.IsDBNull(2) ? (DateTime?)null : rd.GetDateTime(2)
+                });
+            }
+            return Ok(new { count = items.Count, items });
+        }
+        catch (NpgsqlException ex)
+        {
+            _logger.LogWarning(ex, "GET /api/activities/upcoming failed on view, trying fallback tables. SQL: {Sql}", sql);
+            // Fallback simple desde tabla base
+            const string sql2 = @"SELECT id, title, start_time
+                                   FROM public.activities
+                                   WHERE start_time IS NOT NULL AND start_time >= now()
+                                   ORDER BY start_time ASC, id ASC
+                                   LIMIT @take;";
             try
             {
-                take = Math.Clamp(take, 1, 50);
-                await using var cmd = _ds.CreateCommand(sql);
-                cmd.Parameters.AddWithValue("@take", take);
+                await using var cmd2 = _ds.CreateCommand(sql2);
+                cmd2.Parameters.AddWithValue("@take", take);
                 var items = new List<object>();
-                await using var rd = await cmd.ExecuteReaderAsync();
-                while (await rd.ReadAsync())
+                await using var rd2 = await cmd2.ExecuteReaderAsync();
+                while (await rd2.ReadAsync())
                 {
                     items.Add(new
                     {
-                        id = SafeGetInt32(rd, 0, 0),
-                        title = rd.IsDBNull(1) ? null : rd.GetString(1),
-                        start_time = rd.IsDBNull(2) ? (DateTime?)null : rd.GetDateTime(2)
+                        id = SafeGetInt32(rd2, 0, 0),
+                        title = rd2.IsDBNull(1) ? null : rd2.GetString(1),
+                        start_time = rd2.IsDBNull(2) ? (DateTime?)null : rd2.GetDateTime(2)
                     });
                 }
                 return Ok(new { count = items.Count, items });
             }
-            catch (NpgsqlException ex)
+            catch (Exception ex2)
             {
-                _logger.LogWarning(ex, "GET /api/activities/upcoming failed. SQL: {Sql}", sql);
-                return Ok(new { count = 0, items = Array.Empty<object>() });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "GET /api/activities/upcoming unexpected error. SQL: {Sql}", sql);
+                _logger.LogWarning(ex2, "GET /api/activities/upcoming fallback failed. SQL: {Sql}", sql2);
                 return Ok(new { count = 0, items = Array.Empty<object>() });
             }
         }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "GET /api/activities/upcoming unexpected error. SQL: {Sql}", sql);
+            return Ok(new { count = 0, items = Array.Empty<object>() });
+        }
+    }
 
     // Nuevo alias explícito para evitar que "public" se enrute a {id}
     [HttpGet("public")]
