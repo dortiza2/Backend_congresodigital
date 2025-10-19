@@ -242,6 +242,13 @@ public class PublicActivitiesController : ControllerBase
             }
         }
 
+    // Nuevo alias explícito para evitar que "public" se enrute a {id}
+    [HttpGet("public")]
+    public Task<IActionResult> PublicList([FromQuery] string? kinds = null)
+    {
+        return List(kinds);
+    }
+
     private static int TryGetOrdinal(Npgsql.NpgsqlDataReader rd, string name, string? fallback = null)
     {
         try { return rd.GetOrdinal(name); } catch { }
