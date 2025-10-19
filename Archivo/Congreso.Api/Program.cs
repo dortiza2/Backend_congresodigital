@@ -622,7 +622,10 @@ if (!app.Environment.IsDevelopment())
 {
     // Enable HSTS in production
     app.UseHsts();
+    if (app.Environment.IsProduction())
+{
     app.UseHttpsRedirection();
+}
 }
 
 // NUEVO: Structured logging middleware (primero en el pipeline)

@@ -1,0 +1,1 @@
+{"message":"Error interno del servidor","details":"An error occurred while saving the entity changes. See the inner exception for details.","inner":"42804: column \"id\" is of type bigint but expression is of type uuid\n\nPOSITION: 161"}

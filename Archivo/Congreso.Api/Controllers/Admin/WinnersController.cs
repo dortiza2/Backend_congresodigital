@@ -50,25 +50,44 @@ namespace Congreso.Api.Controllers.Admin
             return Ok(winner);
         }
 
+        // DTO para creación de ganador para evitar requerir propiedades de navegación
+        public class CreateWinnerDto
+        {
+            public int EditionYear { get; set; }
+            public System.Guid ActivityId { get; set; }
+            public short Place { get; set; }
+            public System.Guid? TeamId { get; set; }
+            public System.Guid? UserId { get; set; }
+        }
+
         [HttpPost]
-        public async Task<ActionResult<Winner>> CreateWinner([FromBody] Winner winner)
+        public async Task<ActionResult<Winner>> CreateWinner([FromBody] CreateWinnerDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
             // Validar que no exista ya un ganador para la misma combinación
             var existingWinner = await _context.Winners
-                .FirstOrDefaultAsync(w => w.EditionYear == winner.EditionYear && 
-                                         w.ActivityId == winner.ActivityId && 
-                                         w.Place == winner.Place);
+                .FirstOrDefaultAsync(w => w.EditionYear == dto.EditionYear && 
+                                         w.ActivityId == dto.ActivityId && 
+                                         w.Place == dto.Place);
 
             if (existingWinner != null)
             {
-                return Conflict($"Ya existe un ganador para el lugar {winner.Place} en la actividad {winner.ActivityId} del año {winner.EditionYear}.");
+                return Conflict($"Ya existe un ganador para el lugar {dto.Place} en la actividad {dto.ActivityId} del año {dto.EditionYear}.");
             }
 
             try
             {
+                var winner = new Winner
+                {
+                    EditionYear = dto.EditionYear,
+                    ActivityId = dto.ActivityId,
+                    Place = dto.Place,
+                    TeamId = dto.TeamId,
+                    UserId = dto.UserId
+                };
+
                 _context.Winners.Add(winner);
                 await _context.SaveChangesAsync();
 

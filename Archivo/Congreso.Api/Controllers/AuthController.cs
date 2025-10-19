@@ -31,74 +31,272 @@ public class AuthController : ControllerBase
     private readonly IConfiguration _configuration;
     private readonly IAuthTokenService _authTokenService;
     private readonly ILogger<AuthController> _logger;
+    private readonly NpgsqlDataSource _dataSource;
 
-    public AuthController(CongresoDbContext db, IEmailService emailService, ILogger<AuthController> logger, IConfiguration configuration, IAuthTokenService authTokenService)
+    public AuthController(CongresoDbContext db, IEmailService emailService, ILogger<AuthController> logger, IConfiguration configuration, IAuthTokenService authTokenService, NpgsqlDataSource dataSource)
     {
         _db = db;
         _emailService = emailService;
         _logger = logger;
         _configuration = configuration;
         _authTokenService = authTokenService;
+        _dataSource = dataSource;
     }
 
     public record LoginDto(string Email, string Password);
+    public record DebugCreateDto(string Email, string Password, string FullName, int RoleLevel);
 
+    [AllowAnonymous]
+    [HttpGet("debug-user")]
+    public async Task<IActionResult> DebugUser([FromQuery][Required] string email)
+    {
+        try
+        {
+            var normalizedEmail = (email ?? string.Empty).Trim().ToLowerInvariant();
+            using var cmd = _dataSource.CreateCommand("select id, email, password_hash, is_active from users where lower(email) = @email limit 1");
+            cmd.Parameters.Add(new NpgsqlParameter<string>("email", normalizedEmail));
+            using var reader = await cmd.ExecuteReaderAsync();
+            if (!reader.Read())
+            {
+                return Ok(new { found = false, email = normalizedEmail });
+            }
+            var idType = reader.GetFieldType(0);
+            string idValue;
+            if (idType == typeof(Guid))
+            {
+                idValue = reader.GetGuid(0).ToString();
+            }
+            else if (idType == typeof(long))
+            {
+                idValue = reader.GetInt64(0).ToString();
+            }
+            else
+            {
+                idValue = reader.GetValue(0)?.ToString() ?? string.Empty;
+            }
+            var dbEmail = reader.IsDBNull(1) ? normalizedEmail : reader.GetString(1);
+            var pwdHash = reader.IsDBNull(2) ? null : reader.GetString(2);
+            var isActive = !reader.IsDBNull(3) && reader.GetBoolean(3);
+            var hashPreview = string.IsNullOrEmpty(pwdHash) ? "<null>" : (pwdHash.Length > 20 ? pwdHash.Substring(0, 20) + "..." : pwdHash);
+            return Ok(new { found = true, id = idValue, email = dbEmail, isActive, hasHash = !string.IsNullOrEmpty(pwdHash), hashPreview });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "GET /api/auth/debug-user: error al leer usuario");
+            return StatusCode(400, new { statusCode = 400, code = "invalid_operation", message = ex.Message });
+        }
+    }
+
+    [AllowAnonymous]
+    [HttpPost("debug-create-user")]
+    public async Task<IActionResult> DebugCreateUser([FromBody] DebugCreateDto dto)
+    {
+        try
+        {
+            var email = (dto.Email ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(dto.Password))
+            {
+                return BadRequest(new { message = "Email y password son requeridos" });
+            }
+
+            // Verificar si ya existe
+            using (var checkCmd = _dataSource.CreateCommand("select id from users where lower(email) = @email limit 1"))
+            {
+                checkCmd.Parameters.Add(new Npgsql.NpgsqlParameter<string>("email", email));
+                using var reader = await checkCmd.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    return Conflict(new { message = "El usuario ya existe" });
+                }
+            }
+
+            // Hash de password
+            var hash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+
+            // Insertar usuario y obtener id
+            Guid? userGuid = null;
+            long? userLong = null;
+            using (var insertCmd = _dataSource.CreateCommand("insert into users (email, full_name, password_hash, is_active, created_at) values (@email, @full_name, @password_hash, true, now()) returning id"))
+            {
+                insertCmd.Parameters.Add(new Npgsql.NpgsqlParameter<string>("email", email));
+                insertCmd.Parameters.Add(new Npgsql.NpgsqlParameter<string>("full_name", dto.FullName ?? ""));
+                insertCmd.Parameters.Add(new Npgsql.NpgsqlParameter<string>("password_hash", hash));
+
+                using var reader = await insertCmd.ExecuteReaderAsync();
+                if (!await reader.ReadAsync())
+                {
+                    return StatusCode(500, new { message = "No se pudo crear usuario" });
+                }
+                var idType = reader.GetFieldType(0);
+                if (idType == typeof(Guid))
+                {
+                    userGuid = reader.GetGuid(0);
+                }
+                else if (idType == typeof(long))
+                {
+                    userLong = reader.GetInt64(0);
+                }
+                else
+                {
+                    var raw = reader.GetValue(0);
+                    if (raw is Guid g) userGuid = g; else if (raw is long l) userLong = l; else return StatusCode(500, new { message = "Tipo de id no soportado" });
+                }
+            }
+
+            // Determinar roleId según roleLevel solicitado
+            int roleId = dto.RoleLevel switch
+            {
+                3 => 3, // superadmin
+                2 => 2, // admin
+                1 => 1, // staff/asistente
+                0 => 4, // participant/estudiante
+                _ => 4
+            };
+
+            // Insertar rol
+            using (var roleCmd = _dataSource.CreateCommand("insert into user_roles (user_id, role_id) values (@user_id, @role_id)"))
+            {
+                if (userGuid.HasValue)
+                {
+                    roleCmd.Parameters.Add(new Npgsql.NpgsqlParameter<Guid>("user_id", userGuid.Value));
+                }
+                else if (userLong.HasValue)
+                {
+                    roleCmd.Parameters.Add(new Npgsql.NpgsqlParameter<long>("user_id", userLong.Value));
+                }
+                else
+                {
+                    return StatusCode(500, new { message = "Usuario sin id válido" });
+                }
+                roleCmd.Parameters.Add(new Npgsql.NpgsqlParameter<int>("role_id", roleId));
+                await roleCmd.ExecuteNonQueryAsync();
+            }
+
+            var idString = userGuid?.ToString() ?? (userLong?.ToString() ?? string.Empty);
+            return Ok(new { created = true, id = idString, email, roleId });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error en debug-create-user");
+            return StatusCode(400, new { statusCode = 400, code = "invalid_operation", message = ex.Message });
+        }
+    }
     [AllowAnonymous]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
+        Guid? userGuid = null;
+        long? userLong = null;
+        string normalizedEmail = (dto.Email ?? string.Empty).Trim().ToLowerInvariant();
+        string email = normalizedEmail;
+        string? fullName = null;
+        string? pwdHash = null;
+        bool isActive = true;
+        string idString = string.Empty;
+    
         try
         {
-            var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Email == dto.Email);
-
-            if (user == null || string.IsNullOrEmpty(user.PasswordHash) || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+            using var cmd = _dataSource.CreateCommand("select id, email, full_name, password_hash, is_active from users where lower(email) = @email limit 1");
+            cmd.Parameters.Add(new Npgsql.NpgsqlParameter<string>("email", normalizedEmail));
+            using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync())
+            {
+                _logger.LogWarning("Login fallido: usuario no encontrado para email {Email}", normalizedEmail);
                 return Unauthorized(new { message = "Invalid credentials" });
-
-            // Obtener roles del usuario desde la base de datos (tolerante a errores)
-            string[] userRoles = Array.Empty<string>();
-            int roleLevel = 1; // Mayor level = mayor privilegio
-            try
-            {
-                var userRolesData = await _db.UserRoles
-                    .Where(ur => ur.UserId == user.Id)
-                    .Include(ur => ur.Role)
-                    .Select(ur => new { ur.Role.Code, ur.Role.Level })
-                    .ToArrayAsync();
-
-                userRoles = userRolesData.Select(r => r.Code).ToArray();
-                roleLevel = userRolesData.Any() ? userRolesData.Max(r => r.Level ?? 1) : 1;
             }
-            catch (Exception exRoles)
+            var idType = reader.GetFieldType(0);
+            if (idType == typeof(Guid))
             {
-                // Nunca 500 si falla lectura de roles; continuar con roles vacíos
-                _logger.LogWarning(exRoles, "POST /api/auth/login: fallo al obtener roles, continuando con roles vacíos");
-                userRoles = Array.Empty<string>();
-                roleLevel = 1;
+                userGuid = reader.GetGuid(0);
             }
-
-            // Emitir JWT (sin cookies)
-            var (token, exp) = _authTokenService.CreateToken(user.Id, user.Email, userRoles, roleLevel, user.FullName);
-            return Ok(new
+            else if (idType == typeof(long))
             {
-                message = "Login exitoso",
-                token = token,
-                tokenType = "Bearer",
-                expiresAtUtc = exp,
-                user = new { user.Id, user.Email, FullName = user.FullName, roles = userRoles, roleLevel }
-            });
-        }
-        catch (NpgsqlException ex)
-        {
-            _logger.LogWarning(ex, "POST /api/auth/login: error de BD, devolviendo 401 controlado");
-            return Unauthorized(new { message = "Invalid credentials" });
+                userLong = reader.GetInt64(0);
+            }
+            else
+            {
+                var raw = reader.GetValue(0);
+                if (raw is Guid g) userGuid = g; else if (raw is long l) userLong = l;
+            }
+            idString = userGuid?.ToString() ?? (userLong?.ToString() ?? string.Empty);
+            email = reader.IsDBNull(1) ? normalizedEmail : reader.GetString(1);
+            fullName = reader.IsDBNull(2) ? null : reader.GetString(2);
+            pwdHash = reader.IsDBNull(3) ? null : reader.GetString(3);
+            isActive = !reader.IsDBNull(4) && reader.GetBoolean(4);
+    
+            var hasHash = !string.IsNullOrEmpty(pwdHash);
+            bool verified = hasHash && BCrypt.Net.BCrypt.Verify(dto.Password, pwdHash);
+            var hashPreview = string.IsNullOrEmpty(pwdHash) ? "<null>" : (pwdHash!.Length > 12 ? pwdHash.Substring(0, 12) + "..." : pwdHash);
+            _logger.LogInformation("Diagnóstico login(raw): userId={UserId}, email={Email}, isActive={IsActive}, hasHash={HasHash}, verified={Verified}", idString, email, isActive, hasHash, verified);
+            if (!verified || !isActive)
+            {
+                return Unauthorized(new { message = "Invalid credentials" });
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "POST /api/auth/login: error inesperado, devolviendo 401 controlado");
-            return Unauthorized(new { message = "Invalid credentials" });
+            _logger.LogWarning(ex, "POST /api/auth/login: error al leer usuario");
+            return StatusCode(400, new { statusCode = 400, code = "invalid_operation", message = ex.Message });
         }
+    
+        // Obtener roles y roleLevel desde SQL directo
+        string[] roles = Array.Empty<string>();
+        int roleLevel = 1; // default asistente
+        try
+        {
+            using var rolesCmd = _dataSource.CreateCommand("select r.code, coalesce(r.level, 1) as level from user_roles ur join roles r on r.id = ur.role_id where ur.user_id = @userId");
+            if (userGuid.HasValue)
+            {
+                rolesCmd.Parameters.Add(new Npgsql.NpgsqlParameter<Guid>("userId", userGuid.Value));
+            }
+            else if (userLong.HasValue)
+            {
+                rolesCmd.Parameters.Add(new Npgsql.NpgsqlParameter<long>("userId", userLong.Value));
+            }
+            else
+            {
+                rolesCmd.Parameters.Add(new Npgsql.NpgsqlParameter<long>("userId", 0L));
+            }
+            using var rReader = await rolesCmd.ExecuteReaderAsync();
+            var codes = new List<string>();
+            var levels = new List<int>();
+            while (await rReader.ReadAsync())
+            {
+                codes.Add(rReader.GetString(0));
+                levels.Add(rReader.IsDBNull(1) ? 1 : rReader.GetInt32(1));
+            }
+            roles = codes.ToArray();
+            roleLevel = levels.Count > 0 ? levels.Max() : 1;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "POST /api/auth/login: error obteniendo roles para {UserId}", idString);
+        }
+    
+        // Flags de acceso según lógica acordada
+        var canAccessDashboard = roleLevel <= 3;
+        var canAccessAccount = roleLevel == 0 || roleLevel == 4;
+    
+        // Emitir JWT
+        var (token, exp) = userGuid.HasValue
+            ? _authTokenService.CreateToken(userGuid.Value, email, roles, roleLevel, fullName)
+            : _authTokenService.CreateToken(userLong ?? 0L, email, roles, roleLevel, fullName);
+    
+        return Ok(new
+        {
+            token,
+            exp,
+            user = new
+            {
+                id = idString,
+                email,
+                fullName,
+                roles,
+                roleLevel,
+                access = new { dashboard = canAccessDashboard, account = canAccessAccount }
+            }
+        });
     }
-
     [AllowAnonymous]
     [HttpGet("csrf")]
     public IActionResult GetCsrf([FromServices] IAntiforgery antiforgery)
@@ -117,28 +315,35 @@ public class AuthController : ControllerBase
         var email = User.FindFirstValue(ClaimTypes.Email);
         var roles = User.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value).ToArray();
         
-        // Obtener roleLevel desde la base de datos
+        // Obtener roleLevel desde claim o calcular desde BD
         var roleLevel = 1; // Default para asistente
-        if (Guid.TryParse(userId, out var userGuid))
+        var roleLevelClaim = User.FindFirst("roleLevel")?.Value;
+        if (!string.IsNullOrEmpty(roleLevelClaim) && int.TryParse(roleLevelClaim, out var parsed))
         {
-            var userRolesData = await _db.UserRoles
+            roleLevel = parsed;
+        }
+        else if (Guid.TryParse(userId, out var userGuid))
+        {
+            var levels = await _db.UserRoles
                 .Where(ur => ur.UserId == userGuid)
                 .Include(ur => ur.Role)
                 .Select(ur => ur.Role.Level)
                 .ToArrayAsync();
-            
-            if (userRolesData.Any())
-            {
-                roleLevel = userRolesData.Max() ?? 1; // Mayor level = mayor privilegio
-            }
+            roleLevel = levels.Any() ? levels.Max(l => l ?? 1) : 1;
         }
         
+        // Flags de acceso según lógica de negocio
+        var rolesLower = roles.Select(r => r?.ToLowerInvariant()).ToArray();
+        var canAccessDashboard = roleLevel <= 3;
+        var canAccessAccount = roleLevel == 0 || roleLevel == 4;
+
         return Ok(new
         {
             userId = userId,
             email = email,
             roles = roles,
-            roleLevel = roleLevel
+            roleLevel = roleLevel,
+            access = new { dashboard = canAccessDashboard, account = canAccessAccount }
         });
     }
 
@@ -151,22 +356,28 @@ public class AuthController : ControllerBase
         var fullName = User.FindFirstValue(ClaimTypes.Name);
         var roles = User.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value).ToArray();
         
-        // Obtener roleLevel desde la base de datos
+        // Obtener roleLevel desde claim o calcular desde BD
         var roleLevel = 1; // Default para asistente
-        if (Guid.TryParse(userId, out var userGuid))
+        var roleLevelClaim = User.FindFirst("roleLevel")?.Value;
+        if (!string.IsNullOrEmpty(roleLevelClaim) && int.TryParse(roleLevelClaim, out var parsed))
         {
-            var userRolesData = await _db.UserRoles
+            roleLevel = parsed;
+        }
+        else if (Guid.TryParse(userId, out var userGuid))
+        {
+            var levels = await _db.UserRoles
                 .Where(ur => ur.UserId == userGuid)
                 .Include(ur => ur.Role)
                 .Select(ur => ur.Role.Level)
                 .ToArrayAsync();
-            
-            if (userRolesData.Any())
-            {
-                roleLevel = userRolesData.Max() ?? 1; // Mayor level = mayor privilegio
-            }
+            roleLevel = levels.Any() ? levels.Max(l => l ?? 1) : 1;
         }
         
+        // Flags de acceso según lógica de negocio
+        var rolesLower = roles.Select(r => r?.ToLowerInvariant()).ToArray();
+        var canAccessDashboard = roleLevel <= 3;
+        var canAccessAccount = roleLevel == 0 || roleLevel == 4;
+
         return Ok(new
         {
             isAuthenticated = true,
@@ -175,9 +386,10 @@ public class AuthController : ControllerBase
                 id = userId,
                 email = email,
                 name = fullName,
-                roles = roles
-            },
-            roleLevel = roleLevel
+                roles = roles,
+                roleLevel = roleLevel,
+                access = new { dashboard = canAccessDashboard, account = canAccessAccount }
+            }
         });
     }
 
@@ -406,6 +618,8 @@ public class AuthController : ControllerBase
         // Envolver toda la unidad de trabajo en la ExecutionStrategy para soportar reintentos
         var strategy = _db.Database.CreateExecutionStrategy();
         User? user = null;
+        var userRoles = new[] { "STUDENT" };
+        var roleLevel = 0;
 
         try
         {
@@ -470,18 +684,101 @@ public class AuthController : ControllerBase
                     _db.StudentAccounts.Add(studentAccount);
                     await _db.SaveChangesAsync();
 
-                    _logger.LogInformation("Usuario registrado exitosamente");
+                    // Asignar rol de estudiante (roleId 4) de forma robusta
+                    var studentRole = await _db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Id == 4)
+                        ?? await _db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Level == 0)
+                        ?? await _db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Code.ToLower() == "participant" || r.Code.ToLower() == "student");
 
-                    // Commit
+                    if (studentRole != null)
+                    {
+                        _db.UserRoles.Add(new UserRole
+                        {
+                            UserId = user.Id,
+                            RoleId = studentRole.Id
+                        });
+                        await _db.SaveChangesAsync();
+                        _logger.LogInformation("Rol de estudiante asignado al usuario {UserId}", user.Id);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("No se encontró rol estudiante (id=4/level=0). Usuario {UserId} sin rol explícito", user.Id);
+                    }
+
+                    _logger.LogInformation("Guardando cambios en la base de datos tras asignar rol...");
+                    await _db.SaveChangesAsync();
+                    _logger.LogInformation("Cambios guardados exitosamente.");
+
+                    // Confirmar transacción
                     await transaction.CommitAsync();
                     _logger.LogInformation("Transacción confirmada exitosamente");
                 }
-                catch
+                catch (Exception ex)
                 {
                     try { await transaction.RollbackAsync(); } catch { }
                     throw;
                 }
             });
+
+            // Enviar email de confirmación (fuera de la transacción y fuera de los reintentos)
+            if (user != null)
+            {
+                try
+                {
+                    var hasEnrollments = await _db.Enrollments.AnyAsync(e => e.UserId == user.Id);
+                    var frontBaseUrl = _configuration["FRONT_BASE_URL"] ?? "http://localhost:3000";
+
+                    var registrationData = new RegistrationConfirmationEmail
+                    {
+                        UserId = user.Id,
+                        UserEmail = user.Email,
+                        FullName = user.FullName,
+                        IsUmg = user.IsUmg,
+                        OrgName = user.OrgName,
+                        HasEnrollments = hasEnrollments,
+                        FrontBaseUrl = frontBaseUrl
+                    };
+
+                    var emailSent = await _emailService.SendRegistrationConfirmationAsync(registrationData);
+                    if (emailSent)
+                    {
+                        _logger.LogInformation("Email de confirmación enviado exitosamente a {Email}", user.Email);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("No se pudo enviar el email de confirmación a {Email}", user.Email);
+                    }
+                }
+                catch (Exception emailEx)
+                {
+                    _logger.LogError(emailEx, "Error al enviar email de confirmación a {Email}", user.Email);
+                    // No fallar el registro por error de email
+                }
+
+                // Crear claims para la cookie de autenticación
+                var claims = new List<Claim>
+                {
+                    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                    new Claim(ClaimTypes.Email, user.Email),
+                    new Claim(ClaimTypes.Name, user.FullName),
+                    new Claim("roleLevel", roleLevel.ToString())
+                };
+
+                foreach (var role in userRoles)
+                {
+                    claims.Add(new Claim(ClaimTypes.Role, role));
+                }
+
+                var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
+
+                var authProperties = new AuthenticationProperties
+                {
+                    IsPersistent = true,
+                    ExpiresUtc = DateTimeOffset.UtcNow.AddHours(24)
+                };
+
+                await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, claimsPrincipal, authProperties);
+            }
         }
         catch (DbUpdateException ex)
         {
@@ -505,77 +802,21 @@ public class AuthController : ControllerBase
             return StatusCode(500, new { message = "Error interno del servidor", details = ex.Message, inner = ex.InnerException?.Message });
         }
 
-        // Enviar email de confirmación (fuera de la transacción y fuera de los reintentos)
-        try
+        if (user == null)
         {
-            var hasEnrollments = await _db.Enrollments.AnyAsync(e => e.UserId == user!.Id);
-            var frontBaseUrl = _configuration["FRONT_BASE_URL"] ?? "http://localhost:3000";
-
-            var registrationData = new RegistrationConfirmationEmail
-            {
-                UserId = user.Id,
-                UserEmail = user.Email,
-                FullName = user.FullName,
-                IsUmg = user.IsUmg,
-                OrgName = user.OrgName,
-                HasEnrollments = hasEnrollments,
-                FrontBaseUrl = frontBaseUrl
-            };
-
-            var emailSent = await _emailService.SendRegistrationConfirmationAsync(registrationData);
-            if (emailSent)
-            {
-                _logger.LogInformation("Email de confirmación enviado exitosamente a {Email}", user.Email);
-            }
-            else
-            {
-                _logger.LogWarning("No se pudo enviar el email de confirmación a {Email}", user.Email);
-            }
+            return StatusCode(500, new { message = "Error interno del servidor: usuario no encontrado después del registro" });
         }
-        catch (Exception emailEx)
-        {
-            _logger.LogError(emailEx, "Error al enviar email de confirmación a {Email}", user?.Email);
-            // No fallar el registro por error de email
-        }
-
-        // Crear claims para la cookie de autenticación y devolver respuesta
-        var userRoles = new[] { "STUDENT" };
-        var roleLevel = 0;
-
-        var claims = new List<Claim>
-        {
-            new Claim(ClaimTypes.NameIdentifier, user!.Id.ToString()),
-            new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Name, user.FullName),
-            new Claim("roleLevel", roleLevel.ToString())
-        };
-
-        foreach (var role in userRoles)
-        {
-            claims.Add(new Claim(ClaimTypes.Role, role));
-        }
-
-        var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
-
-        var authProperties = new AuthenticationProperties
-        {
-            IsPersistent = true,
-            ExpiresUtc = DateTimeOffset.UtcNow.AddHours(24)
-        };
-
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, claimsPrincipal, authProperties);
 
         return Ok(new
         {
             message = "Usuario registrado exitosamente",
             user = new
             {
-                user!.Id,
-                user.Email,
-                user.FullName,
-                user.IsUmg,
-                user.OrgName,
+                Id = user.Id,
+                Email = user.Email,
+                FullName = user.FullName,
+                IsUmg = user.IsUmg,
+                OrgName = user.OrgName,
                 roles = userRoles,
                 roleLevel = roleLevel
             }

@@ -23,7 +23,7 @@ public partial class User
     [Column("is_umg")]
     public bool IsUmg { get; set; } = false;
 
-    [Column("last_login")]
+    [Column("last_login_at")]
     public DateTime? LastLogin { get; set; }
 
     [Column("created_at")]

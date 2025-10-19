@@ -1,0 +1,17 @@
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Sat, 18 Oct 2025 21:13:54 GMT
+Server: Kestrel
+Cache-Control: no-cache, no-store
+Pragma: no-cache
+Set-Cookie: XSRF-TOKEN=CfDJ8IlntVdVBEBGp9RjrN9Bxu4KqJLxIjMKp_TsIvwoDyyRwxFuwvMs5PpzgIlCO63z9hUzSnL7MQYSxlZ50nkZWI6RoYaGSqNK6F7vDul92IVQBEEVy-wprJVTWUSNFI6HF9EIic7UaG9kEq5ugbUWEG4; path=/; samesite=lax
+Transfer-Encoding: chunked
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https: http:;
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Cross-Origin-Resource-Policy: cross-origin
+Cross-Origin-Opener-Policy: same-origin-allow-popups
+

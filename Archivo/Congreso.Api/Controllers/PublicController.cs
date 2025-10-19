@@ -196,12 +196,46 @@ namespace Congreso.Api.Controllers
         [HttpGet("speakers")]
         public async Task<ActionResult> GetSpeakers()
         {
-            const string sql = @"SELECT id, full_name AS name, bio, org_name AS company, NULL::text AS roleTitle, photo_url AS avatarUrl, social AS links
-                                 FROM public.speakers
-                                 WHERE is_active = true
-                                 ORDER BY full_name ASC;";
             try
             {
+                // Discover available columns to build a resilient SELECT
+                const string schemaSql = @"SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='speakers'";
+                var cols = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                await using (var schemaCmd = _ds.CreateCommand(schemaSql))
+                await using (var schemaRd = await schemaCmd.ExecuteReaderAsync())
+                {
+                    while (await schemaRd.ReadAsync())
+                    {
+                        cols.Add(schemaRd.GetString(0));
+                    }
+                }
+
+                bool hasCompany = cols.Contains("company");
+                bool hasOrgName = cols.Contains("org_name");
+                bool hasAvatarUrl = cols.Contains("avatar_url");
+                bool hasPhotoUrl = cols.Contains("photo_url");
+                bool hasRoleTitle = cols.Contains("role_title");
+                bool hasLinks = cols.Contains("social");
+                bool hasIsActive = cols.Contains("is_active");
+
+                var selectParts = new List<string>
+                {
+                    "id",
+                    "full_name AS name",
+                    "bio"
+                };
+                selectParts.Add(hasCompany ? "company" : (hasOrgName ? "org_name AS company" : "NULL::text AS company"));
+                selectParts.Add(hasRoleTitle ? "role_title AS roleTitle" : "NULL::text AS roleTitle");
+                selectParts.Add(hasAvatarUrl ? "avatar_url AS avatarUrl" : (hasPhotoUrl ? "photo_url AS avatarUrl" : "NULL::text AS avatarUrl"));
+                selectParts.Add(hasLinks ? "social AS links" : "NULL::text AS links");
+
+                var sql = $"SELECT {string.Join(", ", selectParts)} FROM public.speakers";
+                if (hasIsActive)
+                {
+                    sql += " WHERE is_active = true";
+                }
+                sql += " ORDER BY full_name ASC";
+
                 var items = new List<SpeakerDto>();
                 await using var cmd = _ds.CreateCommand(sql);
                 await using var rd = await cmd.ExecuteReaderAsync();
@@ -222,11 +256,12 @@ namespace Congreso.Api.Controllers
                     }
 
                     Dictionary<string, object>? links = null;
-                    if (!rd.IsDBNull(6))
+                    var linksIndex = 6; // id(0), name(1), bio(2), company(3), roleTitle(4), avatarUrl(5), links(6)
+                    if (!rd.IsDBNull(linksIndex))
                     {
                         try
                         {
-                            var json = rd.GetString(6);
+                            var json = rd.GetString(linksIndex);
                             links = JsonSerializer.Deserialize<Dictionary<string, object>>(json);
                         }
                         catch
@@ -245,16 +280,17 @@ namespace Congreso.Api.Controllers
                         Links: links
                     ));
                 }
+
                 return Ok(items);
             }
             catch (NpgsqlException ex)
             {
-                _logger.LogWarning(ex, "GET /api/speakers failed. SQL: {Sql}", sql);
+                _logger.LogWarning(ex, "GET /api/speakers failed during dynamic schema query.");
                 return Ok(new List<SpeakerDto>());
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "GET /api/speakers unexpected error. SQL: {Sql}", sql);
+                _logger.LogWarning(ex, "GET /api/speakers unexpected error during dynamic schema query.");
                 return Ok(new List<SpeakerDto>());
             }
         }
@@ -266,7 +302,7 @@ namespace Congreso.Api.Controllers
             const string sql = @"
                 SELECT 
                     year            AS ""Year"", 
-                    activity_id     AS ""ActivityId"", 
+                    ""activityId""    AS ""ActivityId"", 
                     activity_title  AS ""Title"", 
                     position        AS ""Position"", 
                     user_id         AS ""UserId"", 

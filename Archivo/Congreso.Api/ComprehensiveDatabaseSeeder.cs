@@ -110,6 +110,84 @@ public class ComprehensiveDatabaseSeeder
             Console.WriteLine("✓ Usuarios de prueba creados exitosamente");
         }
 
+        // Asegurar usuarios clave existen siempre
+        var ensureUsers = new[]
+        {
+            new { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655440014"), Email = "admin@congreso.com",       Password = "Admin.123",       FullName = "Administrador Principal", OrgName = "UMG",    IsUmg = true },
+            new { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655440015"), Email = "superadmin@congreso.com",   Password = "SuperAdmin.123",   FullName = "Super Administrador",    OrgName = "UMG",    IsUmg = true },
+            new { Id = Guid.Parse("550e8400-e29b-41d4-a716-446655440013"), Email = "fiwax76533@lorkex.com",     Password = "Test.1234",       FullName = "Usuario Externo de Prueba", OrgName = "Externo", IsUmg = false }
+        };
+        foreach (var eu in ensureUsers)
+        {
+            var existing = await context.Users.FirstOrDefaultAsync(u => u.Email == eu.Email);
+            if (existing == null)
+            {
+                context.Users.Add(new User
+                {
+                    Id = eu.Id,
+                    Email = eu.Email,
+                    PasswordHash = passwordHasher.HashPassword(eu.Password),
+                    FullName = eu.FullName,
+                    OrgName = eu.OrgName,
+                    IsUmg = eu.IsUmg,
+                    Status = "active",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                    IsActive = true
+                });
+            }
+            else
+            {
+                // Forzar contraseña conocida y activar usuario en entorno Development
+                existing.PasswordHash = passwordHasher.HashPassword(eu.Password);
+                existing.UpdatedAt = DateTime.UtcNow;
+                existing.IsActive = true;
+            }
+        }
+        await context.SaveChangesAsync();
+        Console.WriteLine("✓ Usuarios clave asegurados y contraseñas sincronizadas");
+
+        // Asegurar usuario de prueba test@congreso.com (participant)
+        var testUserEmail = "test@congreso.com";
+        var testUserId = Guid.Parse("550e8400-e29b-41d4-a716-446655440016");
+        var testUser = await context.Users.FirstOrDefaultAsync(u => u.Email == testUserEmail);
+        if (testUser == null)
+        {
+            context.Users.Add(new User
+            {
+                Id = testUserId,
+                Email = testUserEmail,
+                PasswordHash = passwordHasher.HashPassword("Test123!"),
+                FullName = "Usuario de Prueba",
+                OrgName = "Externo",
+                IsUmg = false,
+                Status = "active",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync();
+            Console.WriteLine("✓ Usuario test@congreso.com creado");
+        }
+        else
+        {
+            // Forzar contraseña conocida y activar usuario en entorno Development
+            testUser.PasswordHash = passwordHasher.HashPassword("Test123!");
+            testUser.UpdatedAt = DateTime.UtcNow;
+            testUser.IsActive = true;
+            await context.SaveChangesAsync();
+            Console.WriteLine("✓ Usuario test@congreso.com sincronizado");
+        }
+
+        // Asignar rol participant (id=4) al usuario de prueba
+        var testUserRoleExists = await context.UserRoles.AnyAsync(ur => ur.UserId == testUserId && ur.RoleId == 4);
+        if (!testUserRoleExists)
+        {
+            context.UserRoles.Add(new UserRole { UserId = testUserId, RoleId = 4 });
+            await context.SaveChangesAsync();
+            Console.WriteLine("✓ Rol participant asignado a test@congreso.com");
+        }
+
         // 3. ASIGNAR ROLES A USUARIOS
         Console.WriteLine("3. Asignando roles a usuarios...");
         if (!await context.UserRoles.AnyAsync())
@@ -131,6 +209,26 @@ public class ComprehensiveDatabaseSeeder
             await context.UserRoles.AddRangeAsync(userRoles);
             await context.SaveChangesAsync();
             Console.WriteLine("✓ Roles asignados exitosamente");
+        }
+        else
+        {
+            // Asegurar roles clave existen
+            var ensureUserRoles = new[]
+            {
+                new UserRole { UserId = Guid.Parse("550e8400-e29b-41d4-a716-446655440014"), RoleId = 2 }, // admin
+                new UserRole { UserId = Guid.Parse("550e8400-e29b-41d4-a716-446655440015"), RoleId = 3 }, // superadmin
+                new UserRole { UserId = Guid.Parse("550e8400-e29b-41d4-a716-446655440013"), RoleId = 4 }  // externo participante
+            };
+            foreach (var eur in ensureUserRoles)
+            {
+                var exists = await context.UserRoles.AnyAsync(ur => ur.UserId == eur.UserId && ur.RoleId == eur.RoleId);
+                if (!exists)
+                {
+                    context.UserRoles.Add(eur);
+                }
+            }
+            await context.SaveChangesAsync();
+            Console.WriteLine("✓ Roles clave asegurados");
         }
 
         // 4. CREAR SPEAKERS/PONENTES
@@ -305,87 +403,197 @@ public class ComprehensiveDatabaseSeeder
             Console.WriteLine("✓ Actividades creadas exitosamente");
         }
 
-        // 6. SPEAKERS YA ESTÁN RELACIONADOS CON ACTIVIDADES EN EL SEEDER
-        Console.WriteLine("6. Speakers ya están relacionados con actividades...");
-
-        // 7. CREAR GANADORES PARA 2025
-        Console.WriteLine("7. Creando ganadores para 2025...");
-        if (!await context.Winners.AnyAsync(w => w.EditionYear == 2025))
+        // 6. RELACIONAR SPEAKERS CON ACTIVIDADES
+        Console.WriteLine("6. Relacionando speakers con actividades...");
+        try
         {
-            var candidates = new (Guid activityId, Guid userId, short place)[]
+            // Verificar existencia de tablas
+            var hasActivities = await context.Activities.AnyAsync();
+            var hasSpeakers = await context.Speakers.AnyAsync();
+            if (hasActivities && hasSpeakers)
             {
-                (Guid.Parse("770e8400-e29b-41d4-a716-446655440001"), Guid.Parse("550e8400-e29b-41d4-a716-446655440011"), (short)1),
-                (Guid.Parse("770e8400-e29b-41d4-a716-446655440002"), Guid.Parse("550e8400-e29b-41d4-a716-446655440012"), (short)2),
-                (Guid.Parse("770e8400-e29b-41d4-a716-446655440003"), Guid.Parse("550e8400-e29b-41d4-a716-446655440013"), (short)3)
-            };
-
-            var winners = new List<Winner>();
-            foreach (var c in candidates)
-            {
-                var activityExists = await context.Activities.AnyAsync(a => a.Id == c.activityId);
-                var userExists = await context.Users.AnyAsync(u => u.Id == c.userId);
-                if (activityExists && userExists)
+                // Usar SQL directo para tabla puente activity_speakers
+                var relations = new (Guid activityId, Guid speakerId)[]
                 {
-                    winners.Add(new Winner
-                    {
-                        EditionYear = 2025,
-                        ActivityId = c.activityId,
-                        Place = c.place,
-                        UserId = c.userId
-                    });
-                }
-            }
+                    // Charlas
+                    (Guid.Parse("770e8400-e29b-41d4-a716-446655440001"), Guid.Parse("660e8400-e29b-41d4-a716-446655440001")), // IA -> Dr. Carlos
+                    (Guid.Parse("770e8400-e29b-41d4-a716-446655440002"), Guid.Parse("660e8400-e29b-41d4-a716-446655440002")), // Ciberseguridad -> Dra. María
+                    // Talleres
+                    (Guid.Parse("770e8400-e29b-41d4-a716-446655440003"), Guid.Parse("660e8400-e29b-41d4-a716-446655440003")), // APIs RESTful -> Ing. José
+                    (Guid.Parse("770e8400-e29b-41d4-a716-446655440004"), Guid.Parse("660e8400-e29b-41d4-a716-446655440004")), // Introducción ML -> Dra. Ana
+                    // Competencias
+                    (Guid.Parse("770e8400-e29b-41d4-a716-446655440005"), Guid.Parse("660e8400-e29b-41d4-a716-446655440003")), // Hackathon -> Ing. José
+                    (Guid.Parse("770e8400-e29b-41d4-a716-446655440006"), Guid.Parse("660e8400-e29b-41d4-a716-446655440002")), // CTF -> Dra. María
+                };
 
-            if (winners.Count > 0)
-            {
-                await context.Winners.AddRangeAsync(winners);
-                await context.SaveChangesAsync();
-                Console.WriteLine($"✓ Ganadores 2025 creados exitosamente (insertados: {winners.Count})");
+                foreach (var r in relations)
+                {
+                    // Evitar duplicados
+                    var exists = await context.Database.ExecuteSqlRawAsync(
+                        @"INSERT INTO public.activity_speakers (activity_id, speaker_id)
+                           SELECT {0}, {1}
+                           WHERE NOT EXISTS (
+                               SELECT 1 FROM public.activity_speakers
+                               WHERE activity_id = {0} AND speaker_id = {1}
+                           );",
+                        r.activityId, r.speakerId
+                    );
+                }
+
+                Console.WriteLine("✓ Relaciones activity_speakers verificadas/insertadas");
             }
             else
             {
-                Console.WriteLine("↷ Ganadores 2025 omitidos: faltan actividades/usuarios esperados");
+                Console.WriteLine("↷ Omitidas relaciones: faltan actividades o speakers");
             }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("↷ Error creando relaciones activity_speakers: " + ex.Message);
+        }
+
+        // 7. CREAR GANADORES PARA 2025
+        Console.WriteLine("7. Creando ganadores para 2025...");
+        try
+        {
+            if (!await context.Winners.AnyAsync(w => w.EditionYear == 2025))
+            {
+                var candidates = new (Guid activityId, Guid userId, short place)[]
+                {
+                    (Guid.Parse("770e8400-e29b-41d4-a716-446655440001"), Guid.Parse("550e8400-e29b-41d4-a716-446655440011"), (short)1),
+                    (Guid.Parse("770e8400-e29b-41d4-a716-446655440002"), Guid.Parse("550e8400-e29b-41d4-a716-446655440012"), (short)2),
+                    (Guid.Parse("770e8400-e29b-41d4-a716-446655440003"), Guid.Parse("550e8400-e29b-41d4-a716-446655440013"), (short)3)
+                };
+
+                var winners = new List<Winner>();
+                foreach (var c in candidates)
+                {
+                    var activityExists = await context.Activities.AnyAsync(a => a.Id == c.activityId);
+                    var userExists = await context.Users.AnyAsync(u => u.Id == c.userId);
+                    if (activityExists && userExists)
+                    {
+                        winners.Add(new Winner
+                        {
+                            EditionYear = 2025,
+                            ActivityId = c.activityId,
+                            Place = c.place,
+                            UserId = c.userId
+                        });
+                    }
+                }
+
+                if (winners.Count > 0)
+                {
+                    await context.Winners.AddRangeAsync(winners);
+                    await context.SaveChangesAsync();
+                    Console.WriteLine($"✓ Ganadores 2025 creados exitosamente (insertados: {winners.Count})");
+                }
+                else
+                {
+                    Console.WriteLine("↷ Ganadores 2025 omitidos: faltan actividades/usuarios esperados");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("↷ Seed de winners 2025 omitido: tabla 'winners' no existe o error en DB");
+            Console.WriteLine(ex.Message);
+        }
+
+        // 7a. CREAR GANADORES PARA 2024
+        Console.WriteLine("7a. Creando ganadores para 2024...");
+        try
+        {
+            if (!await context.Winners.AnyAsync(w => w.EditionYear == 2024))
+            {
+                var candidates2024 = new (Guid activityId, Guid userId, short place)[]
+                {
+                    (Guid.Parse("770e8400-e29b-41d4-a716-446655440001"), Guid.Parse("550e8400-e29b-41d4-a716-446655440010"), (short)1),
+                    (Guid.Parse("770e8400-e29b-41d4-a716-446655440002"), Guid.Parse("550e8400-e29b-41d4-a716-446655440011"), (short)2),
+                    (Guid.Parse("770e8400-e29b-41d4-a716-446655440003"), Guid.Parse("550e8400-e29b-41d4-a716-446655440012"), (short)3)
+                };
+
+                var winners2024 = new List<Winner>();
+                foreach (var c in candidates2024)
+                {
+                    var activityExists = await context.Activities.AnyAsync(a => a.Id == c.activityId);
+                    var userExists = await context.Users.AnyAsync(u => u.Id == c.userId);
+                    if (activityExists && userExists)
+                    {
+                        winners2024.Add(new Winner
+                        {
+                            EditionYear = 2024,
+                            ActivityId = c.activityId,
+                            Place = c.place,
+                            UserId = c.userId
+                        });
+                    }
+                }
+
+                if (winners2024.Count > 0)
+                {
+                    await context.Winners.AddRangeAsync(winners2024);
+                    await context.SaveChangesAsync();
+                    Console.WriteLine($"✓ Ganadores 2024 creados exitosamente (insertados: {winners2024.Count})");
+                }
+                else
+                {
+                    Console.WriteLine("↷ Ganadores 2024 omitidos: faltan actividades/usuarios esperados");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("↷ Seed de winners 2024 omitido: tabla 'winners' no existe o error en DB");
+            Console.WriteLine(ex.Message);
         }
 
         // 7b. CREAR GANADORES PARA 2023
         Console.WriteLine("7b. Creando ganadores para 2023...");
-        if (!await context.Winners.AnyAsync(w => w.EditionYear == 2023))
+        try
         {
-            var candidates2023 = new (Guid activityId, Guid userId, short place)[]
+            if (!await context.Winners.AnyAsync(w => w.EditionYear == 2023))
             {
-                (Guid.Parse("770e8400-e29b-41d4-a716-446655440001"), Guid.Parse("550e8400-e29b-41d4-a716-446655440010"), (short)1),
-                (Guid.Parse("770e8400-e29b-41d4-a716-446655440004"), Guid.Parse("550e8400-e29b-41d4-a716-446655440011"), (short)2),
-                (Guid.Parse("770e8400-e29b-41d4-a716-446655440006"), Guid.Parse("550e8400-e29b-41d4-a716-446655440012"), (short)3)
-            };
-
-            var winners2023 = new List<Winner>();
-            foreach (var c in candidates2023)
-            {
-                var activityExists = await context.Activities.AnyAsync(a => a.Id == c.activityId);
-                var userExists = await context.Users.AnyAsync(u => u.Id == c.userId);
-                if (activityExists && userExists)
+                var candidates2023 = new (Guid activityId, Guid userId, short place)[]
                 {
-                    winners2023.Add(new Winner
+                    (Guid.Parse("770e8400-e29b-41d4-a716-446655440001"), Guid.Parse("550e8400-e29b-41d4-a716-446655440010"), (short)1),
+                    (Guid.Parse("770e8400-e29b-41d4-a716-446655440004"), Guid.Parse("550e8400-e29b-41d4-a716-446655440011"), (short)2),
+                    (Guid.Parse("770e8400-e29b-41d4-a716-446655440006"), Guid.Parse("550e8400-e29b-41d4-a716-446655440012"), (short)3)
+                };
+
+                var winners2023 = new List<Winner>();
+                foreach (var c in candidates2023)
+                {
+                    var activityExists = await context.Activities.AnyAsync(a => a.Id == c.activityId);
+                    var userExists = await context.Users.AnyAsync(u => u.Id == c.userId);
+                    if (activityExists && userExists)
                     {
-                        EditionYear = 2023,
-                        ActivityId = c.activityId,
-                        Place = c.place,
-                        UserId = c.userId
-                    });
+                        winners2023.Add(new Winner
+                        {
+                            EditionYear = 2023,
+                            ActivityId = c.activityId,
+                            Place = c.place,
+                            UserId = c.userId
+                        });
+                    }
+                }
+
+                if (winners2023.Count > 0)
+                {
+                    await context.Winners.AddRangeAsync(winners2023);
+                    await context.SaveChangesAsync();
+                    Console.WriteLine($"✓ Ganadores 2023 creados exitosamente (insertados: {winners2023.Count})");
+                }
+                else
+                {
+                    Console.WriteLine("↷ Ganadores 2023 omitidos: faltan actividades/usuarios esperados");
                 }
             }
-
-            if (winners2023.Count > 0)
-            {
-                await context.Winners.AddRangeAsync(winners2023);
-                await context.SaveChangesAsync();
-                Console.WriteLine($"✓ Ganadores 2023 creados exitosamente (insertados: {winners2023.Count})");
-            }
-            else
-            {
-                Console.WriteLine("↷ Ganadores 2023 omitidos: faltan actividades/usuarios esperados");
-            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("↷ Seed de winners 2023 omitido: tabla 'winners' no existe o error en DB");
+            Console.WriteLine(ex.Message);
         }
 
         // 8. CREAR INSCRIPCIONES DE PRUEBA
